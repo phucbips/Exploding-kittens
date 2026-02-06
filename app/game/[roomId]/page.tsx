@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
-import GameBoard from '@/components/GameBoard';
+import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
 
 export default function GamePage() {
@@ -174,7 +174,7 @@ export default function GamePage() {
   if (!gameState) return <div className="text-white bg-blue-900 h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <GameBoard
+    <NewGameBoard
         gameState={gameState}
         currentPlayerId={userId}
         onDrawCard={handleDrawCard}
