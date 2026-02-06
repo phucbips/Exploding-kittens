@@ -12,6 +12,7 @@ export default function GamePage() {
   const router = useRouter();
   const [gameState, setGameState] = useState<any>(null);
   const [userId, setUserId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedUserId = sessionStorage.getItem('userId');
@@ -22,13 +23,26 @@ export default function GamePage() {
     setUserId(storedUserId);
 
     const gameRef = ref(db, `rooms/${roomId}`);
+
+    // Add error handling to onValue
     const unsubscribe = onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         setGameState(data);
+        setError(null);
       } else {
-        router.push('/');
+        // Room might not exist or data is null
+        setError('Room not found or empty.');
+        // Optionally redirect after a delay
+        // setTimeout(() => router.push('/'), 3000);
       }
+    }, (error) => {
+        console.error("Firebase read error:", error);
+        if (error.message.includes("permission_denied")) {
+            setError("Permission denied. Please check Database Rules in Firebase Console.");
+        } else {
+            setError(`Connection error: ${error.message}`);
+        }
     });
 
     return () => unsubscribe();
@@ -47,11 +61,16 @@ export default function GamePage() {
         name: gameState.players[index].name
     }));
 
-    await update(ref(db, `rooms/${roomId}`), {
-        ...initialGameData,
-        players: patchedPlayers,
-        gameState: 'playing'
-    });
+    try {
+        await update(ref(db, `rooms/${roomId}`), {
+            ...initialGameData,
+            players: patchedPlayers,
+            gameState: 'playing'
+        });
+    } catch (err: any) {
+        console.error("Start game error:", err);
+        alert(`Failed to start game: ${err.message}`);
+    }
   };
 
   const getNextAlivePlayerIndex = (currentIndex: number, players: any[]) => {
@@ -112,12 +131,17 @@ export default function GamePage() {
         newStatus = 'ended';
     }
 
-    await update(ref(db, `rooms/${roomId}`), {
-        deck: newDeck,
-        players: newPlayers,
-        turnIndex: nextTurnIndex,
-        gameState: newStatus
-    });
+    try {
+        await update(ref(db, `rooms/${roomId}`), {
+            deck: newDeck,
+            players: newPlayers,
+            turnIndex: nextTurnIndex,
+            gameState: newStatus
+        });
+    } catch (err: any) {
+        console.error("Draw card error:", err);
+        alert("Failed to draw card. Check console.");
+    }
   };
 
   const handlePlayCard = async (card: any, cardIndex: number) => {
@@ -163,13 +187,33 @@ export default function GamePage() {
          nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
     }
 
-    await update(ref(db, `rooms/${roomId}`), {
-        players: newPlayers,
-        discardPile: newDiscardPile,
-        deck: currentDeck,
-        turnIndex: nextTurnIndex
-    });
+    try {
+        await update(ref(db, `rooms/${roomId}`), {
+            players: newPlayers,
+            discardPile: newDiscardPile,
+            deck: currentDeck,
+            turnIndex: nextTurnIndex
+        });
+    } catch (err: any) {
+        console.error("Play card error:", err);
+        alert("Failed to play card. Check console.");
+    }
   };
+
+  if (error) {
+      return (
+          <div className="bg-slate-900 h-screen flex items-center justify-center flex-col p-4">
+              <div className="text-red-500 text-2xl font-bold mb-4 text-center">Connection Issue</div>
+              <p className="text-white mb-4 text-center">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-500"
+              >
+                  Retry
+              </button>
+          </div>
+      );
+  }
 
   if (!gameState) return <div className="text-white bg-blue-900 h-screen flex items-center justify-center">Loading...</div>;
 
