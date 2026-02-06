@@ -114,19 +114,25 @@ export const CARD_TYPES = {
     name: 'Mèo Nổ',
     count: 4,
     description: "Nổ tung! Bạn thua cuộc nếu không có lá Gỡ Bom.",
-    action: 'die', // Logic code uses 'die' currently
+    action: 'die',
     image: 'https://explodi.ng/images/cards/exploding-kitten/artworks/Exploding-Kitten-Warp-Core.jpg'
   },
 
-  // --- 8. LÁ FAVOR (GIỮ LẠI ĐỂ ĐỦ GAME) ---
+  // --- 8. LÁ FAVOR (CẬP NHẬT ẢNH MỚI) ---
   FAVOR: {
     id: 'favor',
     name: 'Xin Xỏ',
     image: 'https://explodi.ng/images/cards/favor/artworks/Favor-Beard-Sailing.jpg',
     count: 4,
     description: 'Bắt người chơi khác cho bạn 1 lá bài.',
-    action: 'favor'
+    action: 'favor',
+    variants: [
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Fall-So-Deeply-in-Love.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Get-Enslaved-by-Party-Squirrels.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Rub-Peanut-Butter-on-Your-Belly-Button.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Take-Your-Friends-Beard-Sailing.jpg'
+    ]
   }
 };
 
-export const BACK_CARD_IMAGE = 'https://i.ibb.co/60d9pXQ/card-back.png'; // Link thay thế tạm thời vì user chưa cung cấp
+export const BACK_CARD_IMAGE = 'https://i.ibb.co/60d9pXQ/card-back.png';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
@@ -13,6 +13,9 @@ export default function GamePage() {
   const [gameState, setGameState] = useState<any>(null);
   const [userId, setUserId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+
+  // Ref to trigger UI actions from logic
+  const gameBoardRef = useRef<any>(null);
 
   useEffect(() => {
     const storedUserId = sessionStorage.getItem('userId');
@@ -33,8 +36,6 @@ export default function GamePage() {
       } else {
         // Room might not exist or data is null
         setError('Room not found or empty.');
-        // Optionally redirect after a delay
-        // setTimeout(() => router.push('/'), 3000);
       }
     }, (error) => {
         console.error("Firebase read error:", error);
@@ -173,11 +174,13 @@ export default function GamePage() {
             break;
         case 'SHUFFLE':
             currentDeck = shuffle(currentDeck);
-            alert('Đã xào lại bài!');
+            // Trigger visual shuffle?
             break;
         case 'SEE_FUTURE':
-            const top3 = currentDeck.slice(-3).reverse().map((c: any) => c.name).join(', ');
-            alert(`Tương lai: ${top3}`);
+            const top3 = currentDeck.slice(-3).reverse();
+            if (gameBoardRef.current) {
+                gameBoardRef.current.triggerSeeFuture(top3);
+            }
             break;
         default:
             break;
@@ -219,6 +222,7 @@ export default function GamePage() {
 
   return (
     <NewGameBoard
+        ref={gameBoardRef}
         gameState={gameState}
         currentPlayerId={userId}
         onDrawCard={handleDrawCard}
