@@ -9,7 +9,8 @@ const firebaseConfig = {
   storageBucket: "exploding-kit.firebasestorage.app",
   messagingSenderId: "102352008044",
   appId: "1:102352008044:web:9c54c20b4787f949aeb949",
-  measurementId: "G-KWRWNH3J6T"
+  measurementId: "G-KWRWNH3J6T",
+  databaseURL: "https://exploding-kit-default-rtdb.firebaseio.com"
 };
 
 // Initialize Firebase

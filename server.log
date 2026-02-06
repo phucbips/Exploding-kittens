@@ -1,0 +1,16 @@
+
+> my-game@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+
+✓ Starting...
+✓ Ready in 1312ms
+○ Compiling / ...
+ GET / 200 in 5.9s (compile: 5.5s, render: 430ms)
+ GET / 200 in 87ms (compile: 8ms, render: 78ms)
+ GET / 200 in 196ms (compile: 68ms, render: 127ms)
+ GET / 200 in 176ms (compile: 63ms, render: 113ms)
+[?25h
