@@ -12,6 +12,13 @@ export const shuffle = (array) => {
   return array;
 };
 
+const getRandomVariant = (cardType) => {
+    if (cardType.variants && cardType.variants.length > 0) {
+        return cardType.variants[Math.floor(Math.random() * cardType.variants.length)];
+    }
+    return cardType.image;
+};
+
 export const createDeck = () => {
   let deck = [];
 
@@ -24,7 +31,8 @@ export const createDeck = () => {
         deck.push({
           id: `${key}_${i}_${Math.random().toString(36).substr(2, 9)}`,
           type: key,
-          ...cardType
+          ...cardType,
+          image: getRandomVariant(cardType)
         });
       }
     }
@@ -50,7 +58,8 @@ export const initializeGame = (playerNames) => {
     player.hand.push({
       id: `DEFUSE_${Math.random().toString(36).substr(2, 9)}`,
       type: 'DEFUSE',
-      ...defuseType
+      ...defuseType,
+      image: getRandomVariant(defuseType)
     });
     player.hasDefuse = true;
   });
@@ -65,20 +74,17 @@ export const initializeGame = (playerNames) => {
   });
 
   // Insert remaining Defuse cards into deck
-  // Total Defuse cards - (number of players)
-  // Usually there are 6 Defuse cards total.
-  // If 2 players, 2 used, 4 left.
   const remainingDefuseCount = Math.max(0, defuseType.count - players.length);
   for (let i = 0; i < remainingDefuseCount; i++) {
     deck.push({
         id: `DEFUSE_deck_${i}`,
         type: 'DEFUSE',
-        ...defuseType
+        ...defuseType,
+        image: getRandomVariant(defuseType)
     });
   }
 
   // Insert Exploding Kittens
-  // Number of Exploding Kittens = Number of players - 1
   const explodeCount = Math.max(1, players.length - 1);
   const explodeType = CARD_TYPES.EXPLODE;
 
@@ -86,7 +92,8 @@ export const initializeGame = (playerNames) => {
     deck.push({
       id: `EXPLODE_${i}`,
       type: 'EXPLODE',
-      ...explodeType
+      ...explodeType,
+      image: getRandomVariant(explodeType)
     });
   }
 
