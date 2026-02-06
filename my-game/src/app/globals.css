@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-pacifico);
+  --font-sans: var(--font-quicksand);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #006994;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
