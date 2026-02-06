@@ -16,6 +16,9 @@ const quicksand = Quicksand({
 export const metadata: Metadata = {
   title: "Mèo Nổ - Stitch Edition",
   description: "Game Mèo Nổ phiên bản Stitch siêu vui nhộn!",
+  icons: {
+    icon: '/favicon.ico', // Explicitly use the static file
+  },
 };
 
 export default function RootLayout({
