@@ -6,11 +6,12 @@ import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
+import type { GameState, Card, Player } from '@/types/game';
 
 export default function GamePage() {
   const { roomId } = useParams();
   const router = useRouter();
-  const [gameState, setGameState] = useState<any>(null);
+  const [gameState, setGameState] = useState<GameState | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
@@ -27,14 +28,12 @@ export default function GamePage() {
 
     const gameRef = ref(db, `rooms/${roomId}`);
 
-    // Add error handling to onValue
     const unsubscribe = onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         setGameState(data);
         setError(null);
       } else {
-        // Room might not exist or data is null
         setError('Room not found or empty.');
       }
     }, (error) => {
@@ -86,7 +85,7 @@ export default function GamePage() {
 
   const handleDrawCard = async () => {
     if (!gameState) return;
-    const { deck, players, turnIndex } = gameState;
+    const { deck, players, turnIndex, turnsLeft = 1 } = gameState; // Default 1 if missing
     const currentPlayer = players[turnIndex];
 
     if (currentPlayer.id !== userId) return;
@@ -95,15 +94,20 @@ export default function GamePage() {
     if (newDeck.length === 0) return;
 
     const card = newDeck.pop();
+    if (!card) return;
+
     const newPlayers = [...players];
     const playerIndex = newPlayers.findIndex((p: any) => p.id === userId);
     const player = newPlayers[playerIndex];
+
     let nextTurnIndex = turnIndex;
+    let nextTurnsLeft = turnsLeft - 1; // Decrease turns left to play
 
     if (card.type === 'EXPLODE') {
         const defuseIndex = player.hand ? player.hand.findIndex((c: any) => c.type === 'DEFUSE') : -1;
 
         if (defuseIndex !== -1) {
+            gameBoardRef.current?.triggerDefuse(); // Animation
             alert('Bạn đã rút phải Mèo Nổ! May mà có lá Gỡ Bom!');
             player.hand.splice(defuseIndex, 1);
 
@@ -111,24 +115,31 @@ export default function GamePage() {
             const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
             newDeck.splice(insertIndex, 0, card);
 
-            // Turn ends after Defusing
-            nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+            // If defused, you survived, check if you have more turns or pass
+            if (nextTurnsLeft <= 0) {
+                nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+                nextTurnsLeft = 1; // Reset for next player
+            }
         } else {
             alert('BÙM! Bạn đã bị nổ tung!');
             player.isAlive = false;
-            // Turn passes
+            // You died, turn passes immediately
             nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+            nextTurnsLeft = 1;
         }
     } else {
         // Safe card
         player.hand = [...(player.hand || []), card];
-        // Turn ends
-        nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+        // Only pass turn if no turns left
+        if (nextTurnsLeft <= 0) {
+            nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+            nextTurnsLeft = 1;
+        }
     }
 
     const alivePlayers = newPlayers.filter((p: any) => p.isAlive);
     let newStatus = gameState.gameState;
-    if (alivePlayers.length === 1 && newPlayers.length > 1) { // Ensure >1 initial players
+    if (alivePlayers.length === 1 && newPlayers.length > 1) {
         newStatus = 'ended';
     }
 
@@ -137,17 +148,17 @@ export default function GamePage() {
             deck: newDeck,
             players: newPlayers,
             turnIndex: nextTurnIndex,
+            turnsLeft: nextTurnsLeft,
             gameState: newStatus
         });
     } catch (err: any) {
         console.error("Draw card error:", err);
-        alert("Failed to draw card. Check console.");
     }
   };
 
   const handlePlayCard = async (card: any, cardIndex: number) => {
      if (!gameState) return;
-    const { players, turnIndex, discardPile, deck } = gameState;
+    const { players, turnIndex, discardPile, deck, turnsLeft = 1 } = gameState;
     const currentPlayer = players[turnIndex];
 
     if (currentPlayer.id !== userId) {
@@ -164,30 +175,56 @@ export default function GamePage() {
     const newDiscardPile = [...(discardPile || []), card];
 
     let nextTurnIndex = turnIndex;
-    let shouldPassTurn = false;
+    let nextTurnsLeft = turnsLeft;
     let currentDeck = deck ? [...deck] : [];
 
     switch (card.type) {
         case 'SKIP':
+            nextTurnsLeft -= 1; // Skip one turn
+            gameBoardRef.current?.triggerSkip();
+            break;
         case 'ATTACK':
-            shouldPassTurn = true;
+            nextTurnsLeft = 0; // End current turns
+            // Next player gets 2 turns (or existing + 2 if we implement stacking, but simple rule is 2)
+            // Stacking: nextTurnsLeft = (nextPlayerTurnsLeft || 1) + 2?
+            // Simple: next player takes 2 turns.
+            // We set a temporary flag or just handle it when passing turn logic below.
+            // Actually, we force pass turn now, and set next player's turns to 2.
+            gameBoardRef.current?.triggerAttack();
             break;
         case 'SHUFFLE':
             currentDeck = shuffle(currentDeck);
-            // Trigger visual shuffle?
+            gameBoardRef.current?.triggerShuffle();
             break;
         case 'SEE_FUTURE':
             const top3 = currentDeck.slice(-3).reverse();
-            if (gameBoardRef.current) {
-                gameBoardRef.current.triggerSeeFuture(top3);
+            gameBoardRef.current?.triggerSeeFuture(top3);
+            break;
+        case 'FAVOR':
+            // Logic: Steal a random card from a random ALIVE opponent
+            const opponents = newPlayers.filter((p: any) => p.id !== userId && p.isAlive);
+            if (opponents.length > 0) {
+                const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+                if (randomOpponent.hand && randomOpponent.hand.length > 0) {
+                    const randomCardIndex = Math.floor(Math.random() * randomOpponent.hand.length);
+                    const stolenCard = randomOpponent.hand.splice(randomCardIndex, 1)[0];
+                    player.hand.push(stolenCard);
+                    gameBoardRef.current?.triggerFavor(randomOpponent.name);
+                    alert(`Bạn đã cướp lá ${stolenCard.name} từ ${randomOpponent.name}!`);
+                } else {
+                    alert(`${randomOpponent.name} không còn bài để cướp!`);
+                }
             }
             break;
         default:
             break;
     }
 
-    if (shouldPassTurn) {
+    // Check if turn should pass due to Skip/Attack or just playing action (playing doesn't usually end turn unless it's Attack/Skip)
+    if (nextTurnsLeft <= 0) {
          nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
+         // If Attack was played, next player gets 2 turns. Else 1.
+         nextTurnsLeft = card.type === 'ATTACK' ? 2 : 1;
     }
 
     try {
@@ -195,11 +232,11 @@ export default function GamePage() {
             players: newPlayers,
             discardPile: newDiscardPile,
             deck: currentDeck,
-            turnIndex: nextTurnIndex
+            turnIndex: nextTurnIndex,
+            turnsLeft: nextTurnsLeft
         });
     } catch (err: any) {
         console.error("Play card error:", err);
-        alert("Failed to play card. Check console.");
     }
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
@@ -13,8 +13,6 @@ interface GameBoardProps {
   onPlayCard: (card: any, index: number) => void;
   onStartGame: () => void;
 }
-
-import { forwardRef, useImperativeHandle } from 'react';
 
 const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame }: GameBoardProps, ref) => {
   const { players, deck, discardPile, turnIndex, gameState: status } = gameState;
@@ -36,17 +34,49 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
   const getAvatar = (index: number) => AVATARS[index % AVATARS.length];
 
-  // Helper for "See the Future" modal
-  const [showSeeFuture, setShowSeeFuture] = useState(false);
-  const [futureCards, setFutureCards] = useState<any[]>([]);
+  // Helper for animations
+  const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
+  const [overlayData, setOverlayData] = useState<any>(null);
 
   useImperativeHandle(ref, () => ({
       triggerSeeFuture: (cards: any[]) => {
-          setFutureCards(cards);
-          setShowSeeFuture(true);
-          setTimeout(() => setShowSeeFuture(false), 3000);
+          setOverlayData(cards);
+          setActiveOverlay('see_future');
+          setTimeout(() => setActiveOverlay(null), 3000);
+      },
+      triggerAttack: () => {
+          setActiveOverlay('attack');
+          setTimeout(() => setActiveOverlay(null), 2000);
+      },
+      triggerSkip: () => {
+          setActiveOverlay('skip');
+          setTimeout(() => setActiveOverlay(null), 1500);
+      },
+      triggerDefuse: () => {
+          setActiveOverlay('defuse');
+          setTimeout(() => setActiveOverlay(null), 2500);
+      },
+      triggerShuffle: () => {
+          setActiveOverlay('shuffle');
+          setTimeout(() => setActiveOverlay(null), 1500);
+      },
+      triggerFavor: (targetName: string) => {
+          setOverlayData(targetName);
+          setActiveOverlay('favor');
+          setTimeout(() => setActiveOverlay(null), 2500);
       }
   }));
+
+  const getCardStyle = (type: string) => {
+      switch(type) {
+          case 'ATTACK': return { border: 'border-plasma-cyan', shadow: 'shadow-[0_0_10px_rgba(0,240,255,0.3)]', text: 'text-plasma-cyan', icon: 'swords' };
+          case 'DEFUSE': return { border: 'border-green-400', shadow: 'shadow-[0_0_10px_rgba(74,222,128,0.3)]', text: 'text-green-400', icon: 'build' };
+          case 'SKIP': return { border: 'border-blue-400', shadow: 'shadow-[0_0_10px_rgba(96,165,250,0.3)]', text: 'text-blue-400', icon: 'fast_forward' };
+          case 'NOPE': return { border: 'border-magma-red', shadow: 'shadow-[0_0_10px_rgba(255,69,0,0.3)]', text: 'text-magma-red', icon: 'block' };
+          case 'SEE_FUTURE': return { border: 'border-purple-400', shadow: 'shadow-[0_0_10px_rgba(192,132,252,0.3)]', text: 'text-purple-400', icon: 'visibility' };
+          default: return { border: 'border-gray-400', shadow: 'shadow-[0_0_10px_rgba(156,163,175,0.3)]', text: 'text-gray-400', icon: 'pets' };
+      }
+  };
 
   return (
     <div className="font-display bg-tropical-night text-white h-screen w-full overflow-hidden selection:bg-plasma-cyan selection:text-black">
@@ -130,26 +160,77 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                      </div>
                 )}
 
-                {/* See Future Modal */}
+                {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
-                    {showSeeFuture && (
+                    {activeOverlay === 'see_future' && (
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center gap-4"
                         >
-                            {futureCards.map((card, idx) => (
+                            {overlayData && overlayData.map((card: any, idx: number) => (
                                 <motion.div
                                     key={idx}
-                                    initial={{ y: 50, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
+                                    initial={{ y: 50, opacity: 0, rotateY: 90 }}
+                                    animate={{ y: 0, opacity: 1, rotateY: 0 }}
                                     transition={{ delay: idx * 0.2 }}
-                                    className="w-32 h-48 bg-white rounded-lg overflow-hidden relative"
+                                    className="w-36 h-52 bg-white rounded-lg overflow-hidden relative shadow-2xl"
                                 >
                                     <Image src={card.image} alt={card.type} fill className="object-cover" />
                                 </motion.div>
                             ))}
+                        </motion.div>
+                    )}
+
+                    {activeOverlay === 'attack' && (
+                        <motion.div
+                            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }} exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="text-9xl text-plasma-cyan font-black tracking-tighter drop-shadow-[0_0_30px_rgba(0,240,255,0.8)]">ATTACK!</div>
+                        </motion.div>
+                    )}
+
+                    {activeOverlay === 'skip' && (
+                        <motion.div
+                            initial={{ x: -1000, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 1000, opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="text-8xl text-blue-400 font-bold italic tracking-widest drop-shadow-lg">SKIP &gt;&gt;</div>
+                        </motion.div>
+                    )}
+
+                    {activeOverlay === 'defuse' && (
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none bg-green-500/20"
+                        >
+                            <motion.div
+                                animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}
+                                className="text-6xl text-green-300 font-bold drop-shadow-xl"
+                            >
+                                DEFUSED! 💚
+                            </motion.div>
+                        </motion.div>
+                    )}
+
+                    {activeOverlay === 'shuffle' && (
+                        <motion.div
+                            initial={{ rotate: 0 }} animate={{ rotate: 360 }} exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                        >
+                            <span className="material-symbols-outlined text-9xl text-white/50">autorenew</span>
+                        </motion.div>
+                    )}
+
+                    {activeOverlay === 'favor' && (
+                        <motion.div
+                            initial={{ y: -200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 200, opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                        >
+                            <div className="bg-tiki-wood/90 text-white p-8 rounded-xl shadow-2xl border-4 border-yellow-400">
+                                <h3 className="text-2xl font-bold mb-2">Stolen from</h3>
+                                <p className="text-4xl text-yellow-300">{overlayData}</p>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -189,7 +270,8 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                 <motion.div
                                     initial={{ scale: 0.5, opacity: 0, rotate: 0 }}
                                     animate={{ scale: 1, opacity: 1, rotate: Math.random() * 20 - 10 }}
-                                    className="relative w-32 h-48 rounded-lg overflow-hidden shadow-2xl"
+                                    key={discardPile.length} // Key change triggers animation
+                                    className="relative w-36 h-52 rounded-xl overflow-hidden shadow-2xl"
                                 >
                                     <Image
                                         src={discardPile[discardPile.length-1].image}
@@ -235,7 +317,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         {currentPlayer?.hand && currentPlayer.hand.map((card: any, index: number) => {
                              const config = (CARD_TYPES as any)[card.type] || {};
 
-                             // Removed borders, using just image and scale effect
                              return (
                                 <motion.div
                                     key={card.id || index}
