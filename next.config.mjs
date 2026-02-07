@@ -4,16 +4,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'placehold.co',
+        hostname: 'lh3.googleusercontent.com',
       },
       {
         protocol: 'https',
-        hostname: 'explodi.ng',
+        hostname: 'api.dicebear.com',
       },
-      {
-          protocol: 'https',
-          hostname: 'lh3.googleusercontent.com',
-      }
     ],
   },
 };

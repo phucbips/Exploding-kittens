@@ -47,6 +47,12 @@ export default function GamePage() {
     return () => unsubscribe();
   }, [roomId, router]);
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/?room=${roomId}`;
+    navigator.clipboard.writeText(link);
+    alert('Đã sao chép link mời!');
+  };
+
   const handleStartGame = async () => {
     if (!gameState || !gameState.players) return;
 
@@ -354,7 +360,21 @@ export default function GamePage() {
   if (!gameState) return <div className="text-white bg-blue-900 h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <NewGameBoard
+    <>
+      <div className="absolute top-4 left-4 z-50 flex flex-col gap-2">
+         <div className="bg-blue-950/80 p-2 rounded-lg border border-blue-700 text-xs text-blue-200 backdrop-blur-sm">
+             <div className="flex items-center gap-2 mb-1">
+                 <span className="font-bold text-yellow-400">ID:</span>
+                 <span className="font-mono bg-black/30 px-1 rounded">{String(roomId)}</span>
+                 <button onClick={handleCopyLink} className="text-teal-400 hover:text-white" title="Copy Link">
+                    <span className="material-symbols-outlined text-sm">content_copy</span>
+                 </button>
+             </div>
+             {gameState.gameState === 'waiting' && <p>Chờ người chơi...</p>}
+         </div>
+      </div>
+
+      <NewGameBoard
         ref={gameBoardRef}
         gameState={gameState}
         currentPlayerId={userId}
@@ -364,5 +384,6 @@ export default function GamePage() {
         onGiveCard={handleGiveCard}
         onSelectTarget={handleSelectTarget}
     />
+    </>
   );
 }

@@ -12,6 +12,10 @@
           }
         }
       }
+    },
+    "public_rooms": {
+      ".read": true,
+      ".write": true
     }
   }
 }
