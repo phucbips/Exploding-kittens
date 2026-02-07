@@ -4,7 +4,7 @@ import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
-import { CARD_TYPES } from '@/utils/gameConfig';
+import { CARD_TYPES, CARD_BACK_IMAGE } from '@/utils/gameConfig';
 import type { GameState, Player, Card } from '@/types/game';
 
 interface GameBoardProps {
@@ -17,6 +17,56 @@ interface GameBoardProps {
   onSelectTarget: (targetId: string) => void; // For Favor/Pair
 }
 
+// 3D Card Stack Component
+const CardStack = ({ count, type = 'draw', topCardImage = null }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null }) => {
+    const maxVisible = 5;
+    const safeCount = Math.min(count, maxVisible);
+
+    if (count === 0) return (
+        <div className="w-36 h-52 rounded-xl border-2 border-white/10 bg-black/20 flex items-center justify-center">
+            <span className="text-white/20 text-xs">EMPTY</span>
+        </div>
+    );
+
+    return (
+        <div className="relative w-36 h-52">
+            {/* Render layers below */}
+            {Array.from({ length: safeCount }).map((_, i) => {
+                const offset = i * 2; // px offset
+                const isTop = i === safeCount - 1;
+
+                return (
+                    <div
+                        key={i}
+                        className={`absolute rounded-xl border-2 border-white/20 shadow-xl overflow-hidden bg-slate-800 transition-all duration-300`}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            top: -offset,
+                            left: -offset,
+                            zIndex: i,
+                            transform: type === 'discard' ? `rotate(${(i * 5) % 15}deg)` : 'none'
+                        }}
+                    >
+                         <Image
+                            src={type === 'draw' || !isTop ? CARD_BACK_IMAGE : (topCardImage || CARD_BACK_IMAGE)}
+                            alt="Card"
+                            fill
+                            className="object-cover"
+                        />
+                    </div>
+                );
+            })}
+             {/* Count Badge for Draw Pile */}
+             {type === 'draw' && (
+                <div className="absolute -top-6 -right-6 z-50 bg-red-600 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                    {count}
+                </div>
+             )}
+        </div>
+    );
+};
+
 const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget }: GameBoardProps, ref) => {
   const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing } = gameState;
 
@@ -25,11 +75,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const isMyTurn = players[turnIndex]?.id === currentPlayerId && status === 'playing';
 
   // Logic for interaction states
-  const isTargeting = isMyTurn && pendingAction?.type === 'favor_give' && pendingAction?.sourcePlayerId === currentPlayerId; // Actually targeting happens BEFORE favor_give
-  // Correction: "pendingAction" in DB is usually "waiting for player X to give card".
-  // We need a local state for "Select a player to favor" if we haven't sent the action yet.
-  // But typically we select target immediately when playing the card.
-
+  const isTargeting = isMyTurn && pendingAction?.type === 'favor_give' && pendingAction?.sourcePlayerId === currentPlayerId;
   const [localTargetMode, setLocalTargetMode] = useState<boolean>(false);
   const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
 
@@ -50,14 +96,27 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [overlayData, setOverlayData] = useState<any>(null);
   const [isDealingAnimation, setIsDealingAnimation] = useState(false);
+  const [drawAnimation, setDrawAnimation] = useState<{from: string, to: string} | null>(null);
+  const [prevDeckLen, setPrevDeckLen] = useState(deck ? deck.length : 0);
 
+  // Trigger Dealing Animation
   useEffect(() => {
       if (isDealing) {
           setIsDealingAnimation(true);
-          // Simulate animation duration then clear
           setTimeout(() => setIsDealingAnimation(false), 3000);
       }
   }, [isDealing]);
+
+  // Trigger Draw Animation
+  useEffect(() => {
+      if (deck && deck.length < prevDeckLen) {
+          // A card was drawn. Who drew it? Current turn player usually.
+          // We trigger a visual animation from Deck -> Player
+          setDrawAnimation({ from: 'deck', to: players[turnIndex]?.id || 'unknown' });
+          setTimeout(() => setDrawAnimation(null), 800);
+      }
+      setPrevDeckLen(deck ? deck.length : 0);
+  }, [deck, prevDeckLen, players, turnIndex]);
 
   useImperativeHandle(ref, () => ({
       triggerSeeFuture: (cards: any[]) => {
@@ -94,23 +153,10 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
   const handleOpponentClick = (targetId: string) => {
       if (localTargetMode && selectedCardIndex !== null) {
-          onPlayCard(currentPlayer.hand[selectedCardIndex], selectedCardIndex); // This is where we need to pass targetId
-          // But onPlayCard signature is (card, index). We need to update page.tsx to handle targetId.
-          // Temporary fix: Call a prop "onSelectTarget" which resolves the pending play
+          onPlayCard(currentPlayer.hand[selectedCardIndex], selectedCardIndex);
           onSelectTarget(targetId);
           setLocalTargetMode(false);
           setSelectedCardIndex(null);
-      }
-  };
-
-  const getCardStyle = (type: string) => {
-      switch(type) {
-          case 'ATTACK': return { border: 'border-plasma-cyan', shadow: 'shadow-[0_0_10px_rgba(0,240,255,0.3)]', text: 'text-plasma-cyan', icon: 'swords' };
-          case 'DEFUSE': return { border: 'border-green-400', shadow: 'shadow-[0_0_10px_rgba(74,222,128,0.3)]', text: 'text-green-400', icon: 'build' };
-          case 'SKIP': return { border: 'border-blue-400', shadow: 'shadow-[0_0_10px_rgba(96,165,250,0.3)]', text: 'text-blue-400', icon: 'fast_forward' };
-          case 'NOPE': return { border: 'border-magma-red', shadow: 'shadow-[0_0_10px_rgba(255,69,0,0.3)]', text: 'text-magma-red', icon: 'block' };
-          case 'SEE_FUTURE': return { border: 'border-purple-400', shadow: 'shadow-[0_0_10px_rgba(192,132,252,0.3)]', text: 'text-purple-400', icon: 'visibility' };
-          default: return { border: 'border-gray-400', shadow: 'shadow-[0_0_10px_rgba(156,163,175,0.3)]', text: 'text-gray-400', icon: 'pets' };
       }
   };
 
@@ -136,12 +182,13 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     {opponents.map((player: any, idx: number) => {
                          const isTurn = players[turnIndex]?.id === player.id;
                          const isTargetable = localTargetMode && player.isAlive;
+                         const cardCount = player.hand ? player.hand.length : 0;
 
                          return (
                             <div
                                 key={player.id}
                                 onClick={() => isTargetable && handleOpponentClick(player.id)}
-                                className={`flex flex-col items-center gap-2 group ${isTargetable ? 'cursor-pointer hover:scale-110' : ''} ${isTurn ? 'transform -translate-y-2' : ''}`}
+                                className={`relative flex flex-col items-center gap-2 group ${isTargetable ? 'cursor-pointer hover:scale-110' : ''} ${isTurn ? 'transform -translate-y-2' : ''}`}
                             >
                                 <div className="relative">
                                     <div className={`w-16 h-16 rounded-full border-4 ${isTargetable ? 'border-yellow-400 animate-pulse' : (isTurn ? 'border-plasma-cyan ring-4 ring-plasma-cyan/30' : 'border-tiki-wood')} bg-slate-800 overflow-hidden shadow-lg relative z-10 transition-all`}>
@@ -158,11 +205,19 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                             </div>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-2 -right-2 bg-slate-900 border border-white/20 rounded-full w-8 h-8 flex items-center justify-center z-20 shadow-md">
-                                        <span className="text-xs font-bold text-plasma-cyan">{player.hand ? player.hand.length : 0}</span>
+
+                                    {/* Opponent Hand Count as Card Backs */}
+                                    <div className="absolute -bottom-4 -right-8 w-12 h-16 flex items-center justify-center z-20">
+                                        {/* Simple visual of a stack */}
+                                        <div className="absolute top-0 left-0 w-8 h-12 bg-red-800 rounded border border-white/30 transform -rotate-6"></div>
+                                        <div className="absolute top-0 left-1 w-8 h-12 bg-red-800 rounded border border-white/30 transform rotate-6"></div>
+                                        <div className="absolute top-0 left-0.5 w-8 h-12 bg-red-700 rounded border border-white/30 flex items-center justify-center z-30">
+                                            <span className="font-bold text-xs text-white">{cardCount}</span>
+                                        </div>
                                     </div>
+
                                 </div>
-                                <div className="text-center">
+                                <div className="text-center mt-2">
                                     <p className={`text-sm font-bold drop-shadow-md ${isTargetable ? 'text-yellow-400' : (isTurn ? 'text-plasma-cyan' : 'text-tiki-wood')}`}>{player.name}</p>
                                     {!player.isAlive && <span className="text-red-500 font-bold text-xs">ELIMINATED</span>}
                                 </div>
@@ -207,6 +262,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                 {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
+                    {/* Dealing Animation */}
                     {isDealingAnimation && (
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -214,8 +270,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         >
                             <div className="relative w-full h-full">
                                 {players.map((p: any, idx: number) => {
-                                    // Calculate target position based on player index (simplified)
-                                    // Ideally we map to actual avatar positions
                                     const isMe = p.id === currentPlayerId;
                                     const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
                                     const targetY = isMe ? '90%' : '10%';
@@ -226,13 +280,32 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                             initial={{ x: '50%', y: '50%', scale: 0, opacity: 0 }}
                                             animate={{ x: targetX, y: targetY, scale: 0.5, opacity: 1 }}
                                             transition={{ duration: 1.5, delay: idx * 0.2, ease: "easeInOut" }}
-                                            className="absolute w-24 h-36 bg-yellow-400 rounded-lg border-2 border-white shadow-xl flex items-center justify-center"
+                                            className="absolute flex items-center justify-center"
                                         >
-                                            <span className="text-black font-bold text-xs">DEALING...</span>
+                                           <div className="w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden">
+                                                <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
+                                           </div>
                                         </motion.div>
                                     );
                                 })}
                             </div>
+                        </motion.div>
+                    )}
+
+                    {/* Draw Animation */}
+                    {drawAnimation && (
+                        <motion.div
+                            initial={{ x: '50%', y: '50%', opacity: 1, scale: 0.5 }}
+                            animate={{
+                                x: drawAnimation.to === currentPlayerId ? '50%' : '50%', // Simplified target
+                                y: drawAnimation.to === currentPlayerId ? '100%' : '-10%',
+                                opacity: 0,
+                                scale: 0.2
+                            }}
+                            transition={{ duration: 0.8, ease: "easeIn" }}
+                            className="absolute z-[90] pointer-events-none w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden"
+                        >
+                            <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
                         </motion.div>
                     )}
 
@@ -259,24 +332,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                 <div className="flex items-center justify-center gap-24 w-full max-w-4xl">
                     {/* Draw Pile Area */}
-                    <div className="flex flex-col items-center gap-4 group">
+                    <div
+                         onClick={() => isMyTurn && !pendingAction && onDrawCard()}
+                         className={`flex flex-col items-center gap-4 group transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}
+                    >
                         <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
-                        <div className="relative">
-                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-48 h-12 bg-yellow-200 rounded-full rotate-1 blur-[1px] opacity-80 border-2 border-orange-400" style={{background: 'radial-gradient(circle, #fde047 0%, #f59e0b 100%)'}}></div>
-                            <div
-                                onClick={() => isMyTurn && !pendingAction && onDrawCard()}
-                                className={`relative w-36 h-52 bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl border-2 border-white/20 card-stack flex items-center justify-center ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''} transition-transform duration-300`}
-                            >
-                                <div className="absolute inset-2 border-2 border-dashed border-white/10 rounded-lg flex items-center justify-center">
-                                    <div className="w-16 h-16 rounded-full bg-blue-950/50 flex items-center justify-center">
-                                        <span className="material-symbols-outlined text-4xl text-plasma-cyan/50">rocket_launch</span>
-                                    </div>
-                                </div>
-                                <div className="absolute -top-3 -right-3 bg-red-500 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center shadow-lg border-2 border-slate-900">
-                                    {deck ? deck.length : 0}
-                                </div>
-                            </div>
-                        </div>
+                        <CardStack count={deck ? deck.length : 0} type="draw" />
                     </div>
 
                     {/* Discard Pile Area */}
@@ -284,25 +345,14 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-magma-red transition-colors">Discard Pile</span>
                         <div className="relative w-52 h-52 flex items-center justify-center">
                             <div className="absolute inset-0 rounded-full border-4 border-dashed border-magma-red/60 animate-[spin_20s_linear_infinite]"></div>
-                            <div className="absolute inset-2 rounded-full bg-black/60 volcano-glow flex items-center justify-center overflow-hidden">
-                                <div className="absolute inset-0 opacity-50 bg-black"></div>
-                            </div>
 
-                            {discardPile && discardPile.length > 0 && (
-                                <motion.div
-                                    initial={{ scale: 0.5, opacity: 0, rotate: 0 }}
-                                    animate={{ scale: 1, opacity: 1, rotate: Math.random() * 20 - 10 }}
-                                    key={discardPile.length} // Key change triggers animation
-                                    className="relative w-36 h-52 rounded-xl overflow-hidden shadow-2xl"
-                                >
-                                    <Image
-                                        src={discardPile[discardPile.length-1].image || ''}
-                                        alt="Discarded"
-                                        fill
-                                        className="object-cover"
-                                    />
-                                </motion.div>
-                            )}
+                            <div className="flex items-center justify-center">
+                                <CardStack
+                                    count={discardPile ? discardPile.length : 0}
+                                    type="discard"
+                                    topCardImage={discardPile && discardPile.length > 0 ? discardPile[discardPile.length - 1].image : null}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
