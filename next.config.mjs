@@ -22,6 +22,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'explodi.ng',
       },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
     ],
   },
 };

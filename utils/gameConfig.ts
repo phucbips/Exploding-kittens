@@ -61,7 +61,7 @@ export const CARD_TYPES = {
     count: 4,
     name: 'Xin Xỏ',
     description: 'Buộc 1 người chơi khác phải đưa cho bạn 1 lá bài của họ.',
-    image: 'https://i.imgur.com/7L7L7L7.png', // No new links provided for Favor, keeping old (might break if domain blocked, but I whitelisted imgur still)
+    image: 'https://placehold.co/400x600/f87171/fee2e2?text=FAVOR&font=montserrat',
     variants: []
   },
   SHUFFLE: {
@@ -105,11 +105,48 @@ export const CARD_TYPES = {
       'https://explodi.ng/images/cards/nope/artworks/Nope-Put-on-Your-Necktie-of-Nope.jpg'
     ]
   },
-  TACO_CAT: { count: 4, name: 'Taco Cat', image: 'https://i.imgur.com/1P1P1P1.png' },
-  WATERMELON_CAT: { count: 4, name: 'Dưa Hấu Mèo', image: 'https://i.imgur.com/2Q2Q2Q2.png' },
-  POTATO_CAT: { count: 4, name: 'Khoai Tây Mèo', image: 'https://i.imgur.com/3R3R3R3.png' },
-  BEARD_CAT: { count: 4, name: 'Râu Mèo', image: 'https://i.imgur.com/4S4S4S4.png' },
-  RAINBOW_RALPHING_CAT: { count: 4, name: 'Mèo Cầu Vồng', image: 'https://i.imgur.com/5T5T5T5.png' }
+  TACO_CAT: {
+    count: 4,
+    name: 'Taco Cat',
+    image: 'https://placehold.co/400x600/fde047/854d0e?text=TACO+CAT&font=montserrat'
+  },
+  WATERMELON_CAT: {
+    count: 4,
+    name: 'Dưa Hấu Mèo',
+    image: 'https://placehold.co/400x600/86efac/14532d?text=MELON+CAT&font=montserrat'
+  },
+  POTATO_CAT: {
+    count: 4,
+    name: 'Khoai Tây Mèo',
+    image: 'https://placehold.co/400x600/d4d4d8/52525b?text=POTATO+CAT&font=montserrat'
+  },
+  BEARD_CAT: {
+    count: 4,
+    name: 'Râu Mèo',
+    image: 'https://placehold.co/400x600/cbd5e1/334155?text=BEARD+CAT&font=montserrat'
+  },
+  RAINBOW_RALPHING_CAT: {
+    count: 4,
+    name: 'Mèo Cầu Vồng',
+    image: 'https://placehold.co/400x600/f9a8d4/831843?text=RAINBOW+CAT&font=montserrat'
+  }
 };
 
-export const CARD_BACK_IMAGE = 'https://i.pinimg.com/originals/10/80/a4/1080a4bd1a33cec92019fab5efb3da95.png';
+// Custom SVG Data URI for Card Back (Red Pattern with Bomb)
+const cardBackSvg = `
+<svg width="400" height="600" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="#991b1b"/>
+      <circle cx="20" cy="20" r="10" fill="#7f1d1d"/>
+      <path d="M0 40 L40 0" stroke="#7f1d1d" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#pattern)" />
+  <rect x="20" y="20" width="360" height="560" rx="20" fill="none" stroke="white" stroke-width="10" opacity="0.3"/>
+  <circle cx="200" cy="300" r="120" fill="#7f1d1d" stroke="white" stroke-width="5" />
+  <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-weight="bold" font-size="60" fill="white">BOOM</text>
+</svg>
+`;
+
+export const CARD_BACK_IMAGE = `data:image/svg+xml;base64,${Buffer.from(cardBackSvg).toString('base64')}`;
