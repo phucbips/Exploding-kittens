@@ -42,6 +42,9 @@ function LobbyContent() {
   // Load public rooms when in 'join' view
   useEffect(() => {
     if (view === 'join') {
+      // Trigger Cleanup on Join View Load
+      import('@/utils/cleanup').then(({ cleanOldRooms }) => cleanOldRooms(db));
+
       const publicRoomsRef = ref(db, 'public_rooms');
       const listener = onValue(publicRoomsRef, (snapshot) => {
         const data = snapshot.val();

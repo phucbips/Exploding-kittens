@@ -121,6 +121,7 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
     turnsLeft: 1,
     gameState: 'playing',
     isDealing: true, // Flag for animation
+    lastActive: Date.now(),
     discardPile: [],
     pendingAction: null,
     activeBomb: null

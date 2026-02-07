@@ -15,6 +15,7 @@ export default function GamePage() {
   const [userId, setUserId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [actionIntent, setActionIntent] = useState<{ type: string, cardIndices: number[] } | null>(null);
+  const [stealTarget, setStealTarget] = useState<{playerId: string, playerName: string, cardCount: number, type: string} | null>(null);
 
   const gameBoardRef = useRef<any>(null);
 
@@ -314,8 +315,14 @@ export default function GamePage() {
             if (targetIndex !== -1 && sourceIndex !== -1) {
                 const targetHand = newPlayers[targetIndex].hand;
                 if (targetHand && targetHand.length > 0) {
-                     const randomIndex = Math.floor(Math.random() * targetHand.length);
-                     const stolenCard = newPlayers[targetIndex].hand.splice(randomIndex, 1)[0];
+                     let indexToSteal = (pendingAction as any).targetCardIndex; // Use specific index if provided
+
+                     // Fallback to random if index invalid (safety)
+                     if (indexToSteal === undefined || indexToSteal < 0 || indexToSteal >= targetHand.length) {
+                         indexToSteal = Math.floor(Math.random() * targetHand.length);
+                     }
+
+                     const stolenCard = newPlayers[targetIndex].hand.splice(indexToSteal, 1)[0];
                      newPlayers[sourceIndex].hand.push(stolenCard);
                 }
             }
@@ -373,18 +380,25 @@ export default function GamePage() {
               gameBoardRef.current?.triggerFavor(players[targetIndex]?.name || 'Target');
 
           } else if (actionIntent.type === 'PAIR' || actionIntent.type === 'TRIPLE') {
-              // Pair/Triple -> Set Pending Action with Timer (allow Nope)
-              const pendingAction = {
-                  type: actionIntent.type === 'PAIR' ? 'pair_steal' : 'triple_steal',
-                  sourcePlayerId: userId,
-                  targetPlayerId: targetId
-              };
+              const targetPlayer = newPlayers[targetIndex];
+              const cardCount = targetPlayer.hand ? targetPlayer.hand.length : 0;
 
+              if (cardCount === 0) {
+                  alert("Đối thủ không còn bài để cướp!");
+                  return;
+              }
+
+              setStealTarget({
+                  playerId: targetId,
+                  playerName: targetPlayer.name,
+                  cardCount: cardCount,
+                  type: actionIntent.type
+              });
+
+              // Update Hand and Discard (Effectively Playing the Cards)
               await update(ref(db, `rooms/${roomId}`), {
                   players: newPlayers,
-                  discardPile: newDiscardPile,
-                  pendingAction: pendingAction,
-                  nopeTimer: Date.now() + 4000
+                  discardPile: newDiscardPile
               });
           }
       } catch (err: any) {
@@ -415,6 +429,26 @@ export default function GamePage() {
         });
         alert(`Bạn đã đưa lá ${cardToGive.name} cho đối thủ.`);
       } catch (err: any) { console.error(err); }
+  };
+
+  const handleStealSpecificCard = async (cardIndex: number) => {
+      if (!gameState || !stealTarget) return;
+
+      const pendingAction = {
+          type: stealTarget.type === 'PAIR' ? 'pair_steal' : 'triple_steal',
+          sourcePlayerId: userId,
+          targetPlayerId: stealTarget.playerId,
+          targetCardIndex: cardIndex
+      };
+
+      try {
+           await update(ref(db, `rooms/${roomId}`), {
+              pendingAction: pendingAction,
+              nopeTimer: Date.now() + 4000
+          });
+      } catch (err: any) { console.error(err); }
+
+      setStealTarget(null);
   };
 
   // Modified UI Handler to intercept Targeted Cards
@@ -474,6 +508,8 @@ export default function GamePage() {
         onGiveCard={handleGiveCard}
         onSelectTarget={handleSelectTarget}
         onNope={handleNope}
+        stealTarget={stealTarget}
+        onStealCard={handleStealSpecificCard}
     />
     </>
   );

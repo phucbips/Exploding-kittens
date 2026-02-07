@@ -16,6 +16,8 @@ interface GameBoardProps {
   onGiveCard: (cardIndex: number) => void; // For Favor
   onSelectTarget: (targetId: string) => void; // For Favor/Pair
   onNope: () => void; // New Nope handler
+  stealTarget?: {playerId: string, playerName: string, cardCount: number, type: string} | null;
+  onStealCard?: (cardIndex: number) => void;
 }
 
 // 3D Card Stack Component - Optimized with "Squash" and "Impact"
@@ -94,7 +96,7 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { cou
     );
 };
 
-const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope }: GameBoardProps, ref) => {
+const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope, stealTarget, onStealCard }: GameBoardProps, ref) => {
   const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing, nopeTimer } = gameState;
 
   const currentPlayerIndex = players.findIndex((p: any) => p.id === currentPlayerId);
@@ -162,24 +164,34 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [overlayData, setOverlayData] = useState<any>(null);
   const [isDealingAnimation, setIsDealingAnimation] = useState(false);
+  const [dealingPhase, setDealingPhase] = useState<'none' | 'defuse' | 'hand' | 'bomb'>('none');
   const [drawAnimation, setDrawAnimation] = useState<{from: string, to: string} | null>(null);
   const [prevDeckLen, setPrevDeckLen] = useState(deck ? deck.length : 0);
 
-  // Trigger Dealing Animation
+  // Trigger Dealing Animation Sequence
   useEffect(() => {
       if (isDealing) {
           setIsDealingAnimation(true);
-          setTimeout(() => setIsDealingAnimation(false), 3000);
+          setDealingPhase('defuse');
+
+          // Timeline:
+          // 0s: Start Defuse Deal
+          // 2s: Start Hand Deal (4 cards each)
+          // 4s: Start Bomb Insert
+          // 6s: End
+
+          setTimeout(() => setDealingPhase('hand'), 2000);
+          setTimeout(() => setDealingPhase('bomb'), 4000);
+          setTimeout(() => {
+              setDealingPhase('none');
+              setIsDealingAnimation(false);
+          }, 6000);
       }
   }, [isDealing]);
 
   // Trigger Draw Animation
   useEffect(() => {
       if (deck && deck.length < prevDeckLen) {
-          // A card was drawn. Who drew it? Current turn player usually.
-          // We trigger a visual animation from Deck -> Player
-          // We approximate "Deck" as center and "Player" as bottom (for me) or top (opponents)
-          // Since we don't have exact coordinates without measuring refs, we use fixed percentages.
           setDrawAnimation({ from: 'deck', to: players[turnIndex]?.id || 'unknown' });
           setTimeout(() => setDrawAnimation(null), 800);
       }
@@ -365,37 +377,91 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                      </div>
                  )}
 
+                 {/* Steal Card Overlay (Active Player picks from Victim) */}
+                 {stealTarget && onStealCard && (
+                     <div className="absolute z-50 inset-0 bg-black/90 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn">
+                         <h2 className="text-3xl text-yellow-400 font-bold mb-4">Pick a card from {stealTarget.playerName}!</h2>
+                         <div className="flex flex-wrap gap-4 justify-center max-w-3xl p-4">
+                             {Array.from({ length: stealTarget.cardCount }).map((_, idx) => (
+                                 <motion.div
+                                    key={idx}
+                                    whileHover={{ scale: 1.1, translateY: -10 }}
+                                    onClick={() => onStealCard(idx)}
+                                    className="w-24 h-36 bg-red-900 rounded-lg border-2 border-white/30 cursor-pointer shadow-lg relative overflow-hidden"
+                                 >
+                                      <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
+                                      <div className="absolute inset-0 bg-black/20 hover:bg-transparent transition-colors"></div>
+                                 </motion.div>
+                             ))}
+                         </div>
+                         <p className="text-white/50 mt-4">Click a card back to steal it.</p>
+                     </div>
+                 )}
+
                 {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
-                    {/* Dealing Animation */}
-                    {isDealingAnimation && (
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center"
-                        >
-                            <div className="relative w-full h-full">
-                                {players.map((p: any, idx: number) => {
-                                    const isMe = p.id === currentPlayerId;
-                                    const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
-                                    const targetY = isMe ? '90%' : '10%';
+                    {/* Dealing Animation - Phase 1: Defuse */}
+                    {isDealingAnimation && dealingPhase === 'defuse' && (
+                         <div className="absolute inset-0 z-[100] pointer-events-none">
+                             {players.map((p: any, idx: number) => {
+                                 const isMe = p.id === currentPlayerId;
+                                 const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
+                                 const targetY = isMe ? '90%' : '10%';
+                                 return (
+                                     <motion.div
+                                         key={`defuse-${p.id}`}
+                                         initial={{ top: '50%', left: '50%', scale: 0, opacity: 0 }}
+                                         animate={{ top: targetY, left: targetX, scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
+                                         transition={{ duration: 1.5, ease: "easeInOut" }}
+                                         className="absolute w-24 h-36 rounded-lg border-2 border-green-500 shadow-[0_0_20px_rgba(0,255,0,0.5)] overflow-hidden bg-slate-800"
+                                     >
+                                         <Image src={(CARD_TYPES as any).DEFUSE.image} alt="Defuse" fill className="object-cover" />
+                                     </motion.div>
+                                 );
+                             })}
+                         </div>
+                    )}
 
-                                    return (
-                                        <motion.div
-                                            key={`deal-${p.id}`}
-                                            initial={{ x: '50%', y: '50%', scale: 0, opacity: 0 }}
-                                            animate={{ x: targetX, y: targetY, scale: 0.5, opacity: 1, rotate: 360 }}
-                                            transition={{ duration: 1.5, delay: idx * 0.2, ease: "easeInOut" }}
-                                            className="absolute flex items-center justify-center"
-                                            style={{ top: '50%', left: '50%' }}
-                                        >
-                                           <div className="w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800">
-                                                <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
-                                           </div>
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-                        </motion.div>
+                    {/* Dealing Animation - Phase 2: Hand (4 Cards) */}
+                    {isDealingAnimation && dealingPhase === 'hand' && (
+                        <div className="absolute inset-0 z-[100] pointer-events-none">
+                             {players.map((p: any, pIdx: number) => (
+                                 [0,1,2,3].map((cIdx) => {
+                                     const isMe = p.id === currentPlayerId;
+                                     const targetX = isMe ? '50%' : `${(pIdx + 1) * (100 / (players.length + 1))}%`;
+                                     const targetY = isMe ? '90%' : '10%';
+                                     return (
+                                         <motion.div
+                                             key={`hand-${p.id}-${cIdx}`}
+                                             initial={{ top: '-10%', left: '50%', scale: 1, opacity: 1 }}
+                                             animate={{ top: targetY, left: targetX, scale: 0.5, opacity: 0, x: '-50%', y: '-50%' }}
+                                             transition={{ duration: 0.8, delay: cIdx * 0.2, ease: "easeIn" }}
+                                             className="absolute w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800"
+                                         >
+                                             <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
+                                         </motion.div>
+                                     );
+                                 })
+                             ))}
+                        </div>
+                    )}
+
+                    {/* Dealing Animation - Phase 3: Bomb Insert */}
+                    {isDealingAnimation && dealingPhase === 'bomb' && (
+                        <div className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center">
+                            <motion.div
+                                initial={{ scale: 0, opacity: 0, y: -200 }}
+                                animate={{ scale: 1.5, opacity: 1, y: 0 }}
+                                exit={{ scale: 0, opacity: 0, y: 50 }}
+                                transition={{ duration: 1, type: 'spring' }}
+                                className="relative w-36 h-52 rounded-xl border-4 border-red-600 shadow-[0_0_50px_rgba(255,0,0,0.8)] overflow-hidden bg-black"
+                            >
+                                <Image src={(CARD_TYPES as any).EXPLODE.image} alt="Bomb" fill className="object-cover" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                    <span className="text-red-500 font-black text-4xl animate-pulse">BOMB!</span>
+                                </div>
+                            </motion.div>
+                        </div>
                     )}
 
                     {/* Draw Animation */}
@@ -528,14 +594,21 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                              return (
                                 <motion.div
                                     layout
-                                    initial={{ opacity: 0, y: 50, scale: 0.5 }}
+                                    initial={{ opacity: 0, y: 200, scale: 0.5 }}
                                     animate={{
                                         opacity: 1,
                                         y: isSelected ? -80 : 0,
                                         scale: 1,
-                                        zIndex: isSelected ? 50 : 0
+                                        zIndex: isSelected ? 50 : 0,
+                                        rotate: 0
                                     }}
-                                    exit={{ opacity: 0, scale: 0.5, y: -50 }}
+                                    exit={{
+                                        opacity: 0,
+                                        y: -400, // Fly up towards discard pile
+                                        scale: 0.2,
+                                        rotate: Math.random() * 360,
+                                        transition: { duration: 0.5 }
+                                    }}
                                     transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                     key={card.id || index}
                                     whileHover={{ y: isSelected ? -90 : -60, scale: 1.1, zIndex: 100, rotate: Math.random() * 4 - 2 }}

@@ -61,8 +61,14 @@ export const CARD_TYPES = {
     count: 4,
     name: 'Xin Xỏ',
     description: 'Buộc 1 người chơi khác phải đưa cho bạn 1 lá bài của họ.',
-    image: 'https://placehold.co/400x600/f87171/fee2e2?text=FAVOR&font=montserrat',
-    variants: []
+    image: 'https://explodi.ng/images/cards/favor/artworks/Favor-Fall-So-Deeply-in-Love.jpg',
+    variants: [
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Fall-So-Deeply-in-Love.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Take-Your-Friends-Beard-Sailing.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Get-Enslaved-by-Party-Squirrels.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favor-Rub-Peanut-Butter-on-Your-Belly-Button.jpg',
+        'https://explodi.ng/images/cards/favor/artworks/Favour-Give-A-Horsey-Ride-To-A-Horse.jpg'
+    ]
   },
   SHUFFLE: {
     count: 4,
@@ -100,7 +106,7 @@ export const CARD_TYPES = {
       'https://explodi.ng/images/cards/nope/artworks/Nope-A-Jackanope-Bounds-into-the-Room.jpg',
       'https://explodi.ng/images/cards/nope/artworks/Nope-Deliver-some-Nope-on-Your-Jump-Rope.jpg',
       'https://explodi.ng/images/cards/nope/artworks/Nope-Feed-your-Apponent-Some-Cantanope.jpg',
-      'https://explodi.ng/images/cards/nope/artworks/Nope-Feed-your-Apponent-a-Nope-Sandwich.jpg',
+      'https://explodi.ng/images/cards/nope/artworks/Nope-Feed-your-Opponent-a-Nope-Sandwich.jpg',
       'https://explodi.ng/images/cards/nope/artworks/Nope-Nopestradamus-Speaks-the-Truth.jpg',
       'https://explodi.ng/images/cards/nope/artworks/Nope-Put-on-Your-Necktie-of-Nope.jpg'
     ]
@@ -129,6 +135,27 @@ export const CARD_TYPES = {
     count: 4,
     name: 'Mèo Cầu Vồng',
     image: 'https://explodi.ng/images/cards/cat-card/artworks/Rainbow-Ralphing-Cat.jpg'
+  },
+  // New Cat types or variants as requested
+  BIKINI_CAT: {
+    count: 4,
+    name: 'Mèo Bikini',
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Bikini-Cat.jpg'
+  },
+  SCHRODINGER_CAT: {
+    count: 4,
+    name: 'Mèo Schrodinger',
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Cats-Schrodinger.jpg'
+  },
+  MOMMA_CAT: {
+    count: 4,
+    name: 'Mèo Mẹ',
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Momma-Cat.jpg'
+  },
+  SHY_BLADDER_CAT: {
+    count: 4,
+    name: 'Mèo Bàng Quang',
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Shy-Bladder-Cat.jpg'
   }
 };
 
