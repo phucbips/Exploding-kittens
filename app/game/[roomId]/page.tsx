@@ -14,6 +14,7 @@ export default function GamePage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [actionIntent, setActionIntent] = useState<{ type: string, cardIndices: number[] } | null>(null);
 
   const gameBoardRef = useRef<any>(null);
 
@@ -199,50 +200,6 @@ export default function GamePage() {
 
     const newDiscardPile = [...(discardPile || []), ...cards];
 
-    // IF PAIR/TRIPLE/FAVOR -> Needs Target.
-    if (isPair || isTriple || card.type === 'FAVOR') {
-        // Just update hand/discard and set UI to selection mode?
-        // No, we need to select target FIRST or wait for timer?
-        // User flow: Select Cards -> Click Play -> (If needed) Click Target -> (Then) Wait 3s.
-        // But UI logic is handled in component. Here we just process the "Intent".
-        // Actually, we should probably update DB to show "Player X played Favor" and start 3s timer.
-        // BUT if it needs a target, we need that info.
-        // Let's assume for Favor/Pair/Triple, the UI handled targeting BEFORE calling this if needed?
-        // Or we just set pendingAction = 'select_target' in DB?
-        // Simplest: User clicks "Play 2 Cards" -> UI prompts target -> calls `onSelectTarget` -> which calls `handleActionWithTarget`.
-        // If NO target needed (Attack, Shuffle, Skip, SeeFuture), we start the 3s Timer.
-
-        // Wait, for this iteration, let's stick to: "Play" button triggers immediately if no target needed.
-        // If target needed (Pair/Triple/Favor), we should have selected it?
-        // Let's rely on `onSelectTarget` for those.
-        // So `handlePlayCard` is only for NON-TARGET cards OR initializing the sequence?
-
-        // Refined Logic:
-        // 1. Cards removed from hand. Added to discard.
-        // 2. 3s Timer Starts.
-        // 3. pendingAction set to { type: 'play_action', cardType: ... }.
-        // 4. If Noped, revert.
-        // 5. If Timer ends, execute effect.
-
-        // BUT if target is required, we can't start timer until target selected?
-        // Let's say we start timer AFTER target selection for targeted actions.
-        // For untargeted (Attack, Skip, etc.), we start here.
-
-        if (card.type === 'FAVOR' || isPair || isTriple) {
-             // We need a target. Revert hand changes locally (conceptually) or just tell user to select target first?
-             // UI should block "Play" until target selected? No, standard is Play then Target.
-             // We will trigger "Target Mode" in UI from here? No, strictly data flow.
-             // Let's assume onPlayCard is ONLY called for untargeted cards.
-             // Targeted cards are handled via `onSelectTarget` flow initiated by `localTargetMode`.
-             // But the user asked for a "Play" button.
-
-             // OK, if it's a targeted card/combo, we just set a local "Targeting" state in UI?
-             // But we are in `page.tsx`.
-             // We will handle this in `onUIPlayCard` adapter.
-             return;
-        }
-    }
-
     // UNTARGETED ACTIONS (Skip, Attack, Shuffle, SeeFuture, Nope, etc)
     const pending = {
         type: 'play_action',
@@ -327,25 +284,41 @@ export default function GamePage() {
       let nextTurnIndex = turnIndex;
       let nextTurnsLeft = turnsLeft;
       let currentDeck = deck ? [...deck] : [];
+      let newPlayers = [...players];
 
-      switch (pendingAction.cardType) {
-        case 'SKIP':
-            nextTurnsLeft -= 1;
-            gameBoardRef.current?.triggerSkip();
-            break;
-        case 'ATTACK':
-            nextTurnsLeft = 0;
-            gameBoardRef.current?.triggerAttack();
-            break;
-        case 'SHUFFLE':
-            currentDeck = shuffle(currentDeck);
-            gameBoardRef.current?.triggerShuffle();
-            break;
-        case 'SEE_FUTURE':
-            const top3 = currentDeck.slice(-3).reverse();
-            gameBoardRef.current?.triggerSeeFuture(top3);
-            break;
-        // Targeted actions (Favor/Pair) handled separately
+      if (pendingAction.type === 'play_action') {
+          switch (pendingAction.cardType) {
+            case 'SKIP':
+                nextTurnsLeft -= 1;
+                gameBoardRef.current?.triggerSkip();
+                break;
+            case 'ATTACK':
+                nextTurnsLeft = 0;
+                gameBoardRef.current?.triggerAttack();
+                break;
+            case 'SHUFFLE':
+                currentDeck = shuffle(currentDeck);
+                gameBoardRef.current?.triggerShuffle();
+                break;
+            case 'SEE_FUTURE':
+                const top3 = currentDeck.slice(-3).reverse();
+                gameBoardRef.current?.triggerSeeFuture(top3);
+                break;
+          }
+      } else if (pendingAction.type === 'pair_steal' || pendingAction.type === 'triple_steal') {
+            const targetId = pendingAction.targetPlayerId;
+            const sourceId = pendingAction.sourcePlayerId;
+            const targetIndex = newPlayers.findIndex((p) => p.id === targetId);
+            const sourceIndex = newPlayers.findIndex((p) => p.id === sourceId);
+
+            if (targetIndex !== -1 && sourceIndex !== -1) {
+                const targetHand = newPlayers[targetIndex].hand;
+                if (targetHand && targetHand.length > 0) {
+                     const randomIndex = Math.floor(Math.random() * targetHand.length);
+                     const stolenCard = newPlayers[targetIndex].hand.splice(randomIndex, 1)[0];
+                     newPlayers[sourceIndex].hand.push(stolenCard);
+                }
+            }
       }
 
       if (nextTurnsLeft <= 0) {
@@ -355,6 +328,7 @@ export default function GamePage() {
 
       await update(ref(db, `rooms/${roomId}`), {
           deck: currentDeck,
+          players: newPlayers,
           turnIndex: nextTurnIndex,
           turnsLeft: nextTurnsLeft,
           pendingAction: null,
@@ -362,40 +336,62 @@ export default function GamePage() {
       });
   };
 
-  // New handler for Favor flow
+  // New handler for Favor/Pair/Triple flow
   const handleSelectTarget = async (targetId: string) => {
-      // User selected a target for Favor
-      if (!gameState) return;
-      const { players, turnIndex, discardPile, deck } = gameState;
-      const currentPlayer = players[turnIndex];
-
-      // Find the Favor card in hand (first one)
-      const favorCardIndex = currentPlayer.hand.findIndex((c: Card) => c.type === 'FAVOR');
-      if (favorCardIndex === -1) return;
+      if (!gameState || !actionIntent) return;
+      const { players, discardPile } = gameState;
 
       const newPlayers = [...players];
       const playerIndex = newPlayers.findIndex((p) => p.id === userId);
-      const favorCard = newPlayers[playerIndex].hand.splice(favorCardIndex, 1)[0];
+      const targetIndex = newPlayers.findIndex((p) => p.id === targetId);
 
-      const newDiscardPile = [...(discardPile || []), favorCard];
+      if (targetIndex === -1) return;
 
-      // Set pending action for the TARGET player to give a card
-      const pendingAction = {
-          type: 'favor_give',
-          sourcePlayerId: userId,
-          targetPlayerId: targetId
-      };
+      // Remove played cards from hand based on stored intent
+      const playedCards: Card[] = [];
+      [...actionIntent.cardIndices].sort((a, b) => b - a).forEach(idx => {
+          if (newPlayers[playerIndex].hand[idx]) {
+            playedCards.push(newPlayers[playerIndex].hand.splice(idx, 1)[0]);
+          }
+      });
 
-      // Don't pass turn yet! Wait for resolution.
+      const newDiscardPile = [...(discardPile || []), ...playedCards];
 
       try {
-        await update(ref(db, `rooms/${roomId}`), {
-            players: newPlayers,
-            discardPile: newDiscardPile,
-            pendingAction: pendingAction
-        });
-        gameBoardRef.current?.triggerFavor(players.find((p) => p.id === targetId)?.name || 'Target');
-      } catch (err: any) { console.error(err); }
+          if (actionIntent.type === 'FAVOR') {
+              const pendingAction = {
+                  type: 'favor_give',
+                  sourcePlayerId: userId,
+                  targetPlayerId: targetId
+              };
+
+              await update(ref(db, `rooms/${roomId}`), {
+                  players: newPlayers,
+                  discardPile: newDiscardPile,
+                  pendingAction: pendingAction
+              });
+              gameBoardRef.current?.triggerFavor(players[targetIndex]?.name || 'Target');
+
+          } else if (actionIntent.type === 'PAIR' || actionIntent.type === 'TRIPLE') {
+              // Pair/Triple -> Set Pending Action with Timer (allow Nope)
+              const pendingAction = {
+                  type: actionIntent.type === 'PAIR' ? 'pair_steal' : 'triple_steal',
+                  sourcePlayerId: userId,
+                  targetPlayerId: targetId
+              };
+
+              await update(ref(db, `rooms/${roomId}`), {
+                  players: newPlayers,
+                  discardPile: newDiscardPile,
+                  pendingAction: pendingAction,
+                  nopeTimer: Date.now() + 4000
+              });
+          }
+      } catch (err: any) {
+          console.error("Target action error:", err);
+      }
+
+      setActionIntent(null);
   };
 
   const handleGiveCard = async (cardIndex: number) => {
@@ -424,15 +420,17 @@ export default function GamePage() {
   // Modified UI Handler to intercept Targeted Cards
   const onUIPlayCard = (cards: any[], indices: number[]) => {
       const type = cards[0].type;
-      const isPair = cards.length === 2;
-      const isTriple = cards.length === 3;
+      const isPair = cards.length === 2 && cards[0].type === cards[1].type;
+      const isTriple = cards.length === 3 && cards[0].type === cards[1].type && cards[1].type === cards[2].type;
 
-      if (type === 'FAVOR' || isPair || isTriple) {
-          // Enter target mode
-          // We need to store WHICH cards are being played so we can remove them after target select
-          // Ideally we move this state to Page, but for now let's hack:
-          // We tell GameBoard to enable target mode.
-          // And we keep the selected indices in GameBoard? Yes, GameBoard has `selectedIndices`.
+      if (type === 'FAVOR') {
+          setActionIntent({ type: 'FAVOR', cardIndices: indices });
+          gameBoardRef.current?.enableTargetMode();
+      } else if (isPair) {
+          setActionIntent({ type: 'PAIR', cardIndices: indices });
+          gameBoardRef.current?.enableTargetMode();
+      } else if (isTriple) {
+          setActionIntent({ type: 'TRIPLE', cardIndices: indices });
           gameBoardRef.current?.enableTargetMode();
       } else {
           handlePlayCard(cards, indices);
