@@ -108,27 +108,27 @@ export const CARD_TYPES = {
   TACO_CAT: {
     count: 4,
     name: 'Taco Cat',
-    image: 'https://placehold.co/400x600/fde047/854d0e?text=TACO+CAT&font=montserrat'
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Tacocat.jpg'
   },
   WATERMELON_CAT: {
     count: 4,
     name: 'Dưa Hấu Mèo',
-    image: 'https://placehold.co/400x600/86efac/14532d?text=MELON+CAT&font=montserrat'
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Cattermelon.jpg'
   },
   POTATO_CAT: {
     count: 4,
     name: 'Khoai Tây Mèo',
-    image: 'https://placehold.co/400x600/d4d4d8/52525b?text=POTATO+CAT&font=montserrat'
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Hairy-Potato-Cat.jpg'
   },
   BEARD_CAT: {
     count: 4,
     name: 'Râu Mèo',
-    image: 'https://placehold.co/400x600/cbd5e1/334155?text=BEARD+CAT&font=montserrat'
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Beard-Cat.jpg'
   },
   RAINBOW_RALPHING_CAT: {
     count: 4,
     name: 'Mèo Cầu Vồng',
-    image: 'https://placehold.co/400x600/f9a8d4/831843?text=RAINBOW+CAT&font=montserrat'
+    image: 'https://explodi.ng/images/cards/cat-card/artworks/Rainbow-Ralphing-Cat.jpg'
   }
 };
 

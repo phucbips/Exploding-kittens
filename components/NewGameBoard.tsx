@@ -11,10 +11,11 @@ interface GameBoardProps {
   gameState: GameState;
   currentPlayerId: string;
   onDrawCard: () => void;
-  onPlayCard: (card: any, index: number) => void;
+  onPlayCard: (cards: any[], indices: number[]) => void; // Modified to accept multiple cards
   onStartGame: () => void;
   onGiveCard: (cardIndex: number) => void; // For Favor
   onSelectTarget: (targetId: string) => void; // For Favor/Pair
+  onNope: () => void; // New Nope handler
 }
 
 // 3D Card Stack Component - Optimized with "Squash" and "Impact"
@@ -93,17 +94,56 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { cou
     );
 };
 
-const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget }: GameBoardProps, ref) => {
-  const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing } = gameState;
+const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope }: GameBoardProps, ref) => {
+  const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing, nopeTimer } = gameState;
 
   const currentPlayerIndex = players.findIndex((p: any) => p.id === currentPlayerId);
   const currentPlayer = players[currentPlayerIndex];
   const isMyTurn = players[turnIndex]?.id === currentPlayerId && status === 'playing';
 
-  // Logic for interaction states
-  const isTargeting = isMyTurn && pendingAction?.type === 'favor_give' && pendingAction?.sourcePlayerId === currentPlayerId;
+  // State for multi-selection
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [localTargetMode, setLocalTargetMode] = useState<boolean>(false);
-  const [selectedCardIndex, setSelectedCardIndex] = useState<number | null>(null);
+
+  // Helper to toggle selection
+  const toggleSelectCard = (index: number) => {
+      if (selectedIndices.includes(index)) {
+          setSelectedIndices(selectedIndices.filter(i => i !== index));
+      } else {
+          // Validation: Can only select same type for pairs/triples?
+          // Or limit to max 3? Let's keep it flexible but maybe visual cue.
+          const card = currentPlayer.hand[index];
+          const firstSelected = selectedIndices.length > 0 ? currentPlayer.hand[selectedIndices[0]] : null;
+
+          if (firstSelected && firstSelected.type !== card.type) {
+              // If type different, reset selection to new card (simplified UX)
+              setSelectedIndices([index]);
+          } else {
+              setSelectedIndices([...selectedIndices, index]);
+          }
+      }
+  };
+
+  const handlePlaySelected = () => {
+      // Validate cards (Simple: Must be same type or special 5-diff)
+      const cards = selectedIndices.map(i => currentPlayer.hand[i]);
+      const type = cards[0].type;
+      const allSame = cards.every(c => c.type === type);
+
+      if (cards.length > 1 && !allSame && cards.length !== 5) {
+          alert("Cards must match (Pair/Triple) or be 5 different cards!");
+          return;
+      }
+
+      onPlayCard(cards, selectedIndices);
+      setSelectedIndices([]);
+  };
+
+  // Check if player has Nope
+  const hasNope = currentPlayer?.hand.some((c: Card) => c.type === 'NOPE');
+  const canNope = hasNope && (nopeTimer && Date.now() < nopeTimer); // Simplified, real timer logic needs hydration or server time sync
+  // Actually, we'll just check if `nopeTimer` exists in state.
+  const isNopeActive = !!nopeTimer;
 
   // Opponents mapping (excluding self)
   const opponents = players.filter((p: any) => p.id !== currentPlayerId);
@@ -173,18 +213,15 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
           setActiveOverlay('favor');
           setTimeout(() => setActiveOverlay(null), 2500);
       },
-      enableTargetMode: (cardIndex: number) => {
-          setSelectedCardIndex(cardIndex);
+      enableTargetMode: () => {
           setLocalTargetMode(true);
       }
   }));
 
   const handleOpponentClick = (targetId: string) => {
-      if (localTargetMode && selectedCardIndex !== null) {
-          onPlayCard(currentPlayer.hand[selectedCardIndex], selectedCardIndex);
+      if (localTargetMode) {
           onSelectTarget(targetId);
           setLocalTargetMode(false);
-          setSelectedCardIndex(null);
       }
   };
 
@@ -193,6 +230,40 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
           onDrawCard();
       }
   }
+
+  // Enable target mode from parent via ref (kept for compatibility)
+  // But now we likely trigger it from play logic in parent
+  // We'll update the imperative handle to just set visual state
+  useImperativeHandle(ref, () => ({
+      // ... existing handlers ...
+      enableTargetMode: () => setLocalTargetMode(true),
+      triggerSeeFuture: (cards: any[]) => {
+          setOverlayData(cards);
+          setActiveOverlay('see_future');
+          setTimeout(() => setActiveOverlay(null), 3000);
+      },
+      triggerAttack: () => {
+          setActiveOverlay('attack');
+          setTimeout(() => setActiveOverlay(null), 2000);
+      },
+      triggerSkip: () => {
+          setActiveOverlay('skip');
+          setTimeout(() => setActiveOverlay(null), 1500);
+      },
+      triggerDefuse: () => {
+          setActiveOverlay('defuse');
+          setTimeout(() => setActiveOverlay(null), 2500);
+      },
+      triggerShuffle: () => {
+          setActiveOverlay('shuffle');
+          setTimeout(() => setActiveOverlay(null), 1500);
+      },
+      triggerFavor: (targetName: string) => {
+          setOverlayData(targetName);
+          setActiveOverlay('favor');
+          setTimeout(() => setActiveOverlay(null), 2500);
+      }
+  }));
 
   return (
     <div className="font-display bg-tropical-night text-white h-screen w-full overflow-hidden selection:bg-plasma-cyan selection:text-black">
@@ -406,17 +477,40 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
             {/* BOTTOM: Player Hand & Controls */}
             <footer className="flex-none relative w-full flex flex-col items-center z-50">
-                <div className="absolute -top-10 z-30 flex items-center gap-6">
+                <div className="absolute -top-20 z-30 flex items-center gap-6 pointer-events-auto">
+                    {/* NOPE BUTTON (Left) */}
                     <button
-                        onClick={handleDrawClick}
-                        disabled={!isMyTurn || !!pendingAction}
-                        className={`group relative px-8 py-3 bg-slate-900 rounded-xl border border-plasma-cyan overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-all active:scale-95 ${(!isMyTurn || !!pendingAction) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={onNope}
+                        disabled={!hasNope || !isNopeActive}
+                        className={`w-20 h-20 rounded-full border-4 border-white shadow-xl flex items-center justify-center font-black text-white text-xl transform transition-all active:scale-90 ${hasNope && isNopeActive ? 'bg-red-600 animate-pulse scale-110 cursor-pointer' : 'bg-gray-700 opacity-50 grayscale cursor-not-allowed'}`}
                     >
-                        <div className="absolute inset-0 bg-plasma-cyan/10 group-hover:bg-plasma-cyan/20 transition-colors"></div>
-                        <span className="relative z-10 font-bold text-plasma-cyan tracking-widest uppercase text-sm flex items-center gap-2">
-                            <span className="material-symbols-outlined text-lg">touch_app</span> Draw Card
-                        </span>
+                        NOPE
                     </button>
+
+                    {/* PLAY BUTTON (Center - appears if selected) */}
+                    {selectedIndices.length > 0 && isMyTurn && !pendingAction && (
+                        <motion.button
+                            initial={{ scale: 0 }} animate={{ scale: 1 }}
+                            onClick={handlePlaySelected}
+                            className="px-8 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl border-b-4 border-orange-700 font-bold text-blue-900 shadow-xl uppercase tracking-widest hover:brightness-110 active:border-b-0 active:translate-y-1"
+                        >
+                            Play {selectedIndices.length} Card{selectedIndices.length > 1 ? 's' : ''}
+                        </motion.button>
+                    )}
+
+                    {/* DRAW BUTTON (Right - if no selection) */}
+                    {selectedIndices.length === 0 && (
+                        <button
+                            onClick={handleDrawClick}
+                            disabled={!isMyTurn || !!pendingAction}
+                            className={`group relative px-8 py-3 bg-slate-900 rounded-xl border border-plasma-cyan overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-all active:scale-95 ${(!isMyTurn || !!pendingAction) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            <div className="absolute inset-0 bg-plasma-cyan/10 group-hover:bg-plasma-cyan/20 transition-colors"></div>
+                            <span className="relative z-10 font-bold text-plasma-cyan tracking-widest uppercase text-sm flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg">touch_app</span> Draw Card
+                            </span>
+                        </button>
+                    )}
                 </div>
 
                 <div className="w-full h-56 relative mt-6 bg-[#d2b48c]/10 backdrop-blur-md border-t border-[#d2b48c]/20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col justify-end pb-4">
@@ -428,20 +522,26 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         {currentPlayer?.hand && currentPlayer.hand.map((card: any, index: number) => {
                              const config = (CARD_TYPES as any)[card.type] || {};
 
+                             const isSelected = selectedIndices.includes(index);
                              const isPlayable = isMyTurn && !pendingAction;
 
                              return (
                                 <motion.div
                                     layout
                                     initial={{ opacity: 0, y: 50, scale: 0.5 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    animate={{
+                                        opacity: 1,
+                                        y: isSelected ? -80 : 0,
+                                        scale: 1,
+                                        zIndex: isSelected ? 50 : 0
+                                    }}
                                     exit={{ opacity: 0, scale: 0.5, y: -50 }}
                                     transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                     key={card.id || index}
-                                    whileHover={{ y: -60, scale: 1.1, zIndex: 100, rotate: Math.random() * 4 - 2 }}
+                                    whileHover={{ y: isSelected ? -90 : -60, scale: 1.1, zIndex: 100, rotate: Math.random() * 4 - 2 }}
                                     whileTap={{ scale: 0.95 }}
-                                    onClick={() => isPlayable && onPlayCard(card, index)}
-                                    className={`relative flex-none w-36 h-52 rounded-xl shadow-2xl cursor-pointer group overflow-hidden ${!isPlayable ? 'opacity-50 grayscale' : ''}`}
+                                    onClick={() => isPlayable && toggleSelectCard(index)}
+                                    className={`relative flex-none w-36 h-52 rounded-xl shadow-2xl cursor-pointer group overflow-hidden ${!isPlayable ? 'opacity-50 grayscale' : ''} ${isSelected ? 'ring-4 ring-yellow-400' : ''}`}
                                     style={{ marginLeft: index === 0 ? 0 : -60 }} // Overlap cards
                                 >
                                     <Image
