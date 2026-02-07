@@ -12,7 +12,9 @@ export const shuffle = (array: any[]) => {
 };
 
 const getRandomVariant = (cardType: any) => {
-    // Basic variant logic
+    if (cardType.variants && cardType.variants.length > 0) {
+        return cardType.variants[Math.floor(Math.random() * cardType.variants.length)];
+    }
     return cardType.image;
 };
 
@@ -28,7 +30,7 @@ const createBaseDeck = () => {
           type: key,
           name: cardType.name || '',
           description: cardType.description || '',
-          image: cardType.image || ''
+          image: getRandomVariant(cardType) || ''
         });
       }
     }
@@ -58,12 +60,13 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
 
   // Deal 1 Defuse to each player
   players.forEach(player => {
+    const defuseType = (CARD_TYPES as any).DEFUSE;
     player.hand.push({
       id: `DEFUSE_${Math.random().toString(36).substr(2, 9)}`,
       type: 'DEFUSE',
-      name: (CARD_TYPES as any).DEFUSE.name || '',
-      description: (CARD_TYPES as any).DEFUSE.description || '',
-      image: (CARD_TYPES as any).DEFUSE.image || ''
+      name: defuseType.name || '',
+      description: defuseType.description || '',
+      image: getRandomVariant(defuseType) || ''
     });
   });
 
@@ -83,26 +86,28 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
   const totalDefuses = (CARD_TYPES as any).DEFUSE.count || 6;
   const remainingDefuseCount = Math.max(0, totalDefuses - players.length);
 
+  const defuseType = (CARD_TYPES as any).DEFUSE;
   for (let i = 0; i < remainingDefuseCount; i++) {
     baseDeck.push({
         id: `DEFUSE_deck_${i}_${Math.random().toString(36).substr(2, 9)}`,
         type: 'DEFUSE',
-        name: (CARD_TYPES as any).DEFUSE.name || '',
-        description: (CARD_TYPES as any).DEFUSE.description || '',
-        image: (CARD_TYPES as any).DEFUSE.image || ''
+        name: defuseType.name || '',
+        description: defuseType.description || '',
+        image: getRandomVariant(defuseType) || ''
     });
   }
 
   // 5. Insert Exploding Kittens
   // Count = Players - 1
   const explodeCount = Math.max(1, players.length - 1);
+  const explodeType = (CARD_TYPES as any).EXPLODE;
   for (let i = 0; i < explodeCount; i++) {
     baseDeck.push({
       id: `EXPLODE_${i}_${Math.random().toString(36).substr(2, 9)}`,
       type: 'EXPLODE',
-      name: (CARD_TYPES as any).EXPLODE.name || '',
-      description: (CARD_TYPES as any).EXPLODE.description || '',
-      image: (CARD_TYPES as any).EXPLODE.image || ''
+      name: explodeType.name || '',
+      description: explodeType.description || '',
+      image: getRandomVariant(explodeType) || ''
     });
   }
 
