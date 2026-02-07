@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, remove } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
@@ -32,6 +32,13 @@ export default function GamePage() {
       if (data) {
         setGameState(data);
         setError(null);
+
+        // Host Presence for Game Page
+        if (data.players && data.players[0]?.id === storedUserId) {
+            onDisconnect(ref(db, `public_rooms/${roomId}`)).remove();
+            onDisconnect(ref(db, `rooms/${roomId}`)).remove();
+        }
+
       } else {
         setError('Room not found or empty.');
       }

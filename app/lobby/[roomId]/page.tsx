@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, remove } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import Image from 'next/image';
 import { initializeGame } from '@/utils/gameLogic';
@@ -41,6 +41,19 @@ export default function LobbyPage() {
             if (data.gameState === 'playing') {
                 router.push(`/game/${roomId}`);
             }
+
+    // Setup Presence / Disconnect Logic
+    if (userId && data.players && data.players[0]?.id === userId) {
+        // I am the Host
+        // If I disconnect, remove the room from public listing and eventually destroy it
+        onDisconnect(ref(db, `public_rooms/${roomId}`)).remove();
+        onDisconnect(ref(db, `rooms/${roomId}`)).remove();
+    } else if (userId) {
+        // I am a guest
+        // If I disconnect, remove me from the players list?
+        // This is tricky with arrays in Firebase, better to handle explicit leave.
+        // For now, just focus on Host closing room.
+    }
         } else {
             router.push('/');
         }
@@ -86,6 +99,9 @@ export default function LobbyPage() {
           await update(ref(db, `public_rooms/${roomId}`), {
               status: 'playing'
           });
+
+        // Clear disconnect for room destruction (keep room alive if host disconnects momentarily during game start?)
+        // Or keep it to ensure cleanup. For now, keep it.
 
       } catch (err: any) {
           console.error(err);
@@ -200,7 +216,22 @@ export default function LobbyPage() {
                 )}
 
                 <button
-                    onClick={() => router.push('/')}
+                    onClick={async () => {
+                        if (isHost) {
+                            if (confirm('Bạn là chủ phòng. Rời phòng sẽ giải tán phòng?')) {
+                                await remove(ref(db, `public_rooms/${roomId}`));
+                                await remove(ref(db, `rooms/${roomId}`));
+                                router.push('/');
+                            }
+                        } else {
+                            // Guest leave logic (remove from players array)
+                            // Ideally filter out self from players list
+                            const newPlayers = roomData.players.filter((p: any) => p.id !== currentUser.id);
+                            await update(ref(db, `rooms/${roomId}`), { players: newPlayers });
+                            await update(ref(db, `public_rooms/${roomId}`), { playerCount: newPlayers.length });
+                            router.push('/');
+                        }
+                    }}
                     className="w-full py-3 bg-transparent hover:bg-white/10 rounded-xl font-bold text-blue-300 transition-colors"
                 >
                     Leave Room

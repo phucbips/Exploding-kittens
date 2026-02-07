@@ -26,9 +26,9 @@ const createBaseDeck = () => {
         deck.push({
           id: `${key}_${Math.random().toString(36).substr(2, 9)}`,
           type: key,
-          name: cardType.name,
-          description: cardType.description,
-          image: cardType.image
+          name: cardType.name || '',
+          description: cardType.description || '',
+          image: cardType.image || ''
         });
       }
     }
@@ -61,9 +61,9 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
     player.hand.push({
       id: `DEFUSE_${Math.random().toString(36).substr(2, 9)}`,
       type: 'DEFUSE',
-      name: (CARD_TYPES as any).DEFUSE.name,
-      description: (CARD_TYPES as any).DEFUSE.description,
-      image: (CARD_TYPES as any).DEFUSE.image
+      name: (CARD_TYPES as any).DEFUSE.name || '',
+      description: (CARD_TYPES as any).DEFUSE.description || '',
+      image: (CARD_TYPES as any).DEFUSE.image || ''
     });
   });
 
@@ -87,9 +87,9 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
     baseDeck.push({
         id: `DEFUSE_deck_${i}_${Math.random().toString(36).substr(2, 9)}`,
         type: 'DEFUSE',
-        name: (CARD_TYPES as any).DEFUSE.name,
-        description: (CARD_TYPES as any).DEFUSE.description,
-        image: (CARD_TYPES as any).DEFUSE.image
+        name: (CARD_TYPES as any).DEFUSE.name || '',
+        description: (CARD_TYPES as any).DEFUSE.description || '',
+        image: (CARD_TYPES as any).DEFUSE.image || ''
     });
   }
 
@@ -100,9 +100,9 @@ export const initializeGame = (playerNames: string[], settings: any = {}) => {
     baseDeck.push({
       id: `EXPLODE_${i}_${Math.random().toString(36).substr(2, 9)}`,
       type: 'EXPLODE',
-      name: (CARD_TYPES as any).EXPLODE.name,
-      description: (CARD_TYPES as any).EXPLODE.description,
-      image: (CARD_TYPES as any).EXPLODE.image
+      name: (CARD_TYPES as any).EXPLODE.name || '',
+      description: (CARD_TYPES as any).EXPLODE.description || '',
+      image: (CARD_TYPES as any).EXPLODE.image || ''
     });
   }
 
