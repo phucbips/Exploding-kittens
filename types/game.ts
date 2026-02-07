@@ -22,4 +22,11 @@ export interface GameState {
   turnIndex: number;
   turnsLeft: number;
   gameState: 'waiting' | 'playing' | 'ended';
+  pendingAction?: {
+    type: 'favor_give' | 'explode' | 'pair_steal';
+    sourcePlayerId?: string;
+    targetPlayerId?: string;
+    count?: number;
+  } | null;
+  activeBomb?: Card | null;
 }

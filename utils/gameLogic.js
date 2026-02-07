@@ -104,8 +104,10 @@ export const initializeGame = (playerNames) => {
     deck,
     players,
     turnIndex: 0,
-    turnsLeft: 1, // Default 1 turn per player
-    gameState: 'playing', // waiting, playing, ended
-    discardPile: []
+    turnsLeft: 1,
+    gameState: 'playing',
+    discardPile: [],
+    pendingAction: null,
+    activeBomb: null
   };
 };
