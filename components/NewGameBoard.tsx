@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, forwardRef, useImperativeHandle } from 'react';
+import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
@@ -18,7 +18,7 @@ interface GameBoardProps {
 }
 
 const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget }: GameBoardProps, ref) => {
-  const { players, deck, discardPile, turnIndex, gameState: status, pendingAction } = gameState;
+  const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing } = gameState;
 
   const currentPlayerIndex = players.findIndex((p: any) => p.id === currentPlayerId);
   const currentPlayer = players[currentPlayerIndex];
@@ -49,6 +49,15 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   // Helper for animations
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [overlayData, setOverlayData] = useState<any>(null);
+  const [isDealingAnimation, setIsDealingAnimation] = useState(false);
+
+  useEffect(() => {
+      if (isDealing) {
+          setIsDealingAnimation(true);
+          // Simulate animation duration then clear
+          setTimeout(() => setIsDealingAnimation(false), 3000);
+      }
+  }, [isDealing]);
 
   useImperativeHandle(ref, () => ({
       triggerSeeFuture: (cards: any[]) => {
@@ -198,6 +207,35 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                 {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
+                    {isDealingAnimation && (
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center"
+                        >
+                            <div className="relative w-full h-full">
+                                {players.map((p: any, idx: number) => {
+                                    // Calculate target position based on player index (simplified)
+                                    // Ideally we map to actual avatar positions
+                                    const isMe = p.id === currentPlayerId;
+                                    const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
+                                    const targetY = isMe ? '90%' : '10%';
+
+                                    return (
+                                        <motion.div
+                                            key={`deal-${p.id}`}
+                                            initial={{ x: '50%', y: '50%', scale: 0, opacity: 0 }}
+                                            animate={{ x: targetX, y: targetY, scale: 0.5, opacity: 1 }}
+                                            transition={{ duration: 1.5, delay: idx * 0.2, ease: "easeInOut" }}
+                                            className="absolute w-24 h-36 bg-yellow-400 rounded-lg border-2 border-white shadow-xl flex items-center justify-center"
+                                        >
+                                            <span className="text-black font-bold text-xs">DEALING...</span>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
                     {activeOverlay === 'see_future' && (
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

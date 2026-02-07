@@ -22,6 +22,7 @@ export interface GameState {
   turnIndex: number;
   turnsLeft: number;
   gameState: 'waiting' | 'playing' | 'ended';
+  isDealing?: boolean;
   pendingAction?: {
     type: 'favor_give' | 'explode' | 'pair_steal';
     sourcePlayerId?: string;

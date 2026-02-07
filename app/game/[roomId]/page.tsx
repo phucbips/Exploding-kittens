@@ -54,27 +54,8 @@ export default function GamePage() {
   };
 
   const handleStartGame = async () => {
-    if (!gameState || !gameState.players) return;
-
-    const playerNames = gameState.players.map((p: any) => p.name);
-    const initialGameData = initializeGame(playerNames);
-
-    const patchedPlayers = initialGameData.players.map((p: any, index: number) => ({
-        ...p,
-        id: gameState.players[index].id,
-        name: gameState.players[index].name
-    }));
-
-    try {
-        await update(ref(db, `rooms/${roomId}`), {
-            ...initialGameData,
-            players: patchedPlayers,
-            gameState: 'playing'
-        });
-    } catch (err: any) {
-        console.error("Start game error:", err);
-        alert(`Failed to start game: ${err.message}`);
-    }
+    // Game start is now handled in Lobby
+    alert("Game already started!");
   };
 
   const getNextAlivePlayerIndex = (currentIndex: number, players: Player[]) => {

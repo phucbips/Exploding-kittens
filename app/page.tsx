@@ -115,7 +115,7 @@ function LobbyContent() {
       sessionStorage.setItem('userName', name);
       sessionStorage.setItem('userAvatar', selectedAvatar);
 
-      router.push(`/game/${newRoomId}`);
+      router.push(`/lobby/${newRoomId}`);
 
     } catch (err: any) {
       console.error(err);
@@ -194,7 +194,11 @@ function LobbyContent() {
       sessionStorage.setItem('userName', name);
       sessionStorage.setItem('userAvatar', selectedAvatar);
 
-      router.push(`/game/${cleanRoomId}`);
+      if (roomData.gameState === 'playing') {
+          router.push(`/game/${cleanRoomId}`);
+      } else {
+          router.push(`/lobby/${cleanRoomId}`);
+      }
 
     } catch (err: any) {
       console.error(err);
@@ -264,8 +268,14 @@ function LobbyContent() {
         </div>
 
         {/* RIGHT PANEL: MAIN CONTENT */}
-        <div className="flex-1 p-8 bg-gradient-to-br from-blue-800 to-blue-900 flex flex-col">
-            <h1 className="text-4xl font-bold text-center text-yellow-300 drop-shadow-md mb-8">
+        <div className="flex-1 p-8 bg-gradient-to-br from-blue-800 to-blue-900 flex flex-col relative">
+            <div className="absolute top-4 left-4">
+                <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 drop-shadow-sm">
+                    EXPLODING KITTENS
+                </h1>
+            </div>
+
+            <h1 className="text-4xl font-bold text-center text-yellow-300 drop-shadow-md mb-8 mt-8">
                 Mèo Nổ <span className="text-xl text-teal-200 block">Stitch Edition</span>
             </h1>
 
