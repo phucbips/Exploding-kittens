@@ -12,6 +12,9 @@ export default function Lobby() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const MAX_NAME_LENGTH = 15;
+  const MAX_ROOM_ID_LENGTH = 10;
+
   const generateRoomId = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
@@ -19,6 +22,11 @@ export default function Lobby() {
   const handleCreateRoom = async () => {
     if (!name.trim()) {
       setError('Vui lòng nhập tên của bạn!');
+      return;
+    }
+
+    if (name.length > MAX_NAME_LENGTH) {
+      setError(`Tên không được quá ${MAX_NAME_LENGTH} ký tự!`);
       return;
     }
 
@@ -58,6 +66,21 @@ export default function Lobby() {
   const handleJoinRoom = async () => {
     if (!name.trim() || !roomId.trim()) {
       setError('Nhập tên và ID phòng đi nào!');
+      return;
+    }
+
+    if (name.length > MAX_NAME_LENGTH) {
+      setError(`Tên không được quá ${MAX_NAME_LENGTH} ký tự!`);
+      return;
+    }
+
+    if (roomId.length > MAX_ROOM_ID_LENGTH) {
+      setError(`ID phòng không được quá ${MAX_ROOM_ID_LENGTH} ký tự!`);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9]+$/.test(roomId)) {
+      setError('ID phòng chỉ chứa chữ và số!');
       return;
     }
 
@@ -121,6 +144,7 @@ export default function Lobby() {
             <input
               type="text"
               value={name}
+              maxLength={MAX_NAME_LENGTH}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-4 py-3 rounded-lg bg-blue-900 border-2 border-blue-600 focus:border-yellow-400 focus:outline-none text-white placeholder-blue-400 transition-colors"
               placeholder="Ví dụ: Stitch, Lilo..."
@@ -146,6 +170,7 @@ export default function Lobby() {
               <input
                 type="text"
                 value={roomId}
+                maxLength={MAX_ROOM_ID_LENGTH}
                 onChange={(e) => setRoomId(e.target.value.toUpperCase())}
                 className="flex-1 px-4 py-3 rounded-lg bg-blue-900 border-2 border-blue-600 focus:border-teal-400 focus:outline-none text-white placeholder-blue-400 uppercase"
                 placeholder="ID Phòng"
