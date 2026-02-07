@@ -17,52 +17,78 @@ interface GameBoardProps {
   onSelectTarget: (targetId: string) => void; // For Favor/Pair
 }
 
-// 3D Card Stack Component
-const CardStack = ({ count, type = 'draw', topCardImage = null }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null }) => {
-    const maxVisible = 5;
-    const safeCount = Math.min(count, maxVisible);
+// 3D Card Stack Component - Optimized with "Squash" and "Impact"
+const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void }) => {
+    const thickness = Math.min(count, 20); // Clamp visual thickness
 
-    if (count === 0) return (
+    const generateStackShadow = (size: number) => {
+        let shadow = "";
+        for (let i = 1; i <= size; i++) {
+            shadow += `${i}px ${i}px 0px 0px ${type === 'draw' ? '#1e293b' : '#334155'}${i === size ? '' : ','}`;
+        }
+        return shadow;
+    };
+
+    if (count === 0 && type === 'draw') return (
         <div className="w-36 h-52 rounded-xl border-2 border-white/10 bg-black/20 flex items-center justify-center">
             <span className="text-white/20 text-xs">EMPTY</span>
         </div>
     );
 
-    return (
-        <div className="relative w-36 h-52">
-            {/* Render layers below */}
-            {Array.from({ length: safeCount }).map((_, i) => {
-                const offset = i * 2; // px offset
-                const isTop = i === safeCount - 1;
+    // Impact Animation trigger (when count increases for discard)
+    // We use a key to re-trigger animation on change if needed, or rely on whileTap for interaction.
+    // For "Impact" on discard (new card landing), we can use `animate`.
 
-                return (
-                    <div
-                        key={i}
-                        className={`absolute rounded-xl border-2 border-white/20 shadow-xl overflow-hidden bg-slate-800 transition-all duration-300`}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            top: -offset,
-                            left: -offset,
-                            zIndex: i,
-                            transform: type === 'discard' ? `rotate(${(i * 5) % 15}deg)` : 'none'
-                        }}
-                    >
-                         <Image
-                            src={type === 'draw' || !isTop ? CARD_BACK_IMAGE : (topCardImage || CARD_BACK_IMAGE)}
-                            alt="Card"
-                            fill
-                            className="object-cover"
-                        />
-                    </div>
-                );
-            })}
-             {/* Count Badge for Draw Pile */}
-             {type === 'draw' && (
-                <div className="absolute -top-6 -right-6 z-50 bg-red-600 text-white font-bold w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                    {count}
+    return (
+        <div className="relative perspective-1000 group cursor-pointer" onClick={onClick}>
+            {/* Main Stack Container */}
+            <motion.div
+                className="relative w-36 h-52 rounded-xl transition-all duration-300 ease-in-out border-2 border-white/20"
+                style={{
+                    backgroundColor: type === 'draw' ? '#1d4ed8' : '#475569',
+                    boxShadow: generateStackShadow(thickness),
+                    transform: `rotateX(25deg) rotateZ(-10deg) translateY(${-thickness}px)`,
+                }}
+                whileTap={type === 'draw' ? { scaleY: 0.9, scaleX: 1.05, translateY: 5 } : {}}
+                animate={type === 'discard' ? { x: [0, -2, 2, 0], scale: [1, 1.02, 1] } : {}}
+                transition={{ duration: 0.2 }}
+                key={count} // Re-trigger impact on count change for discard
+            >
+                {/* Top Face */}
+                <div className="absolute inset-0 w-full h-full rounded-lg overflow-hidden flex items-center justify-center bg-slate-800">
+                   {type === 'draw' ? (
+                     <div className="relative w-full h-full">
+                         <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
+                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center animate-pulse border-2 border-white/30 backdrop-blur-sm">
+                                <span className="text-white font-bold text-2xl drop-shadow-md">EK</span>
+                            </div>
+                         </div>
+                     </div>
+                   ) : (
+                     <div className="relative w-full h-full bg-white p-2">
+                        {topCardImage ? (
+                            <Image src={topCardImage} alt="Top Card" fill className="object-cover rounded" />
+                        ) : (
+                            <div className="border-2 border-dashed border-gray-400 w-full h-full rounded flex items-center justify-center text-gray-400 font-bold">
+                                DISCARD
+                            </div>
+                        )}
+                     </div>
+                   )}
                 </div>
-             )}
+
+                {/* Badge */}
+                <div className="absolute -top-4 -right-4 bg-yellow-400 text-black font-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-black text-sm z-10">
+                  {count}
+                </div>
+            </motion.div>
+
+            {/* Floor Shadow */}
+            <div
+                className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-32 h-8 bg-black/50 blur-xl rounded-[100%] transition-all duration-500 pointer-events-none"
+                style={{ transform: `scale(${1 + thickness / 40})` }}
+            />
         </div>
     );
 };
@@ -112,6 +138,8 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
       if (deck && deck.length < prevDeckLen) {
           // A card was drawn. Who drew it? Current turn player usually.
           // We trigger a visual animation from Deck -> Player
+          // We approximate "Deck" as center and "Player" as bottom (for me) or top (opponents)
+          // Since we don't have exact coordinates without measuring refs, we use fixed percentages.
           setDrawAnimation({ from: 'deck', to: players[turnIndex]?.id || 'unknown' });
           setTimeout(() => setDrawAnimation(null), 800);
       }
@@ -159,6 +187,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
           setSelectedCardIndex(null);
       }
   };
+
+  const handleDrawClick = () => {
+      if (isMyTurn && !pendingAction) {
+          onDrawCard();
+      }
+  }
 
   return (
     <div className="font-display bg-tropical-night text-white h-screen w-full overflow-hidden selection:bg-plasma-cyan selection:text-black">
@@ -278,11 +312,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                         <motion.div
                                             key={`deal-${p.id}`}
                                             initial={{ x: '50%', y: '50%', scale: 0, opacity: 0 }}
-                                            animate={{ x: targetX, y: targetY, scale: 0.5, opacity: 1 }}
+                                            animate={{ x: targetX, y: targetY, scale: 0.5, opacity: 1, rotate: 360 }}
                                             transition={{ duration: 1.5, delay: idx * 0.2, ease: "easeInOut" }}
                                             className="absolute flex items-center justify-center"
+                                            style={{ top: '50%', left: '50%' }}
                                         >
-                                           <div className="w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden">
+                                           <div className="w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800">
                                                 <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
                                            </div>
                                         </motion.div>
@@ -295,15 +330,17 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     {/* Draw Animation */}
                     {drawAnimation && (
                         <motion.div
-                            initial={{ x: '50%', y: '50%', opacity: 1, scale: 0.5 }}
+                            initial={{ x: '50%', y: '50%', opacity: 1, scale: 1, rotate: 0 }}
                             animate={{
-                                x: drawAnimation.to === currentPlayerId ? '50%' : '50%', // Simplified target
-                                y: drawAnimation.to === currentPlayerId ? '100%' : '-10%',
+                                x: drawAnimation.to === currentPlayerId ? '50%' : (players.length > 2 ? '10%' : '90%'), // Simplistic target logic
+                                y: drawAnimation.to === currentPlayerId ? '100%' : '0%',
                                 opacity: 0,
-                                scale: 0.2
+                                scale: 1.5,
+                                rotate: 360
                             }}
-                            transition={{ duration: 0.8, ease: "easeIn" }}
-                            className="absolute z-[90] pointer-events-none w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden"
+                            transition={{ duration: 0.8, ease: "easeInOut" }}
+                            className="absolute z-[90] pointer-events-none w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800"
+                            style={{ top: '50%', left: '50%' }}
                         >
                             <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
                         </motion.div>
@@ -330,18 +367,19 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     {/* ... other animations ... */}
                 </AnimatePresence>
 
-                <div className="flex items-center justify-center gap-24 w-full max-w-4xl">
+                <div className="flex items-center justify-center gap-24 w-full max-w-4xl relative z-10">
                     {/* Draw Pile Area */}
-                    <div
-                         onClick={() => isMyTurn && !pendingAction && onDrawCard()}
-                         className={`flex flex-col items-center gap-4 group transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}
-                    >
+                    <div className={`flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
                         <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
-                        <CardStack count={deck ? deck.length : 0} type="draw" />
+                        <CardStack
+                            count={deck ? deck.length : 0}
+                            type="draw"
+                            onClick={handleDrawClick}
+                        />
                     </div>
 
                     {/* Discard Pile Area */}
-                    <div className="flex flex-col items-center gap-4 group">
+                    <div className="flex flex-col items-center gap-4">
                         <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-magma-red transition-colors">Discard Pile</span>
                         <div className="relative w-52 h-52 flex items-center justify-center">
                             <div className="absolute inset-0 rounded-full border-4 border-dashed border-magma-red/60 animate-[spin_20s_linear_infinite]"></div>
@@ -367,10 +405,10 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
             </main>
 
             {/* BOTTOM: Player Hand & Controls */}
-            <footer className="flex-none relative w-full flex flex-col items-center">
+            <footer className="flex-none relative w-full flex flex-col items-center z-50">
                 <div className="absolute -top-10 z-30 flex items-center gap-6">
                     <button
-                        onClick={() => isMyTurn && !pendingAction && onDrawCard()}
+                        onClick={handleDrawClick}
                         disabled={!isMyTurn || !!pendingAction}
                         className={`group relative px-8 py-3 bg-slate-900 rounded-xl border border-plasma-cyan overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-all active:scale-95 ${(!isMyTurn || !!pendingAction) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
@@ -386,20 +424,25 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                     <div className="flex items-end justify-center px-10 gap-2 overflow-x-auto overflow-y-visible hand-scroll min-h-[220px] pb-4 pt-10 scroll-smooth">
 
+                        <AnimatePresence>
                         {currentPlayer?.hand && currentPlayer.hand.map((card: any, index: number) => {
                              const config = (CARD_TYPES as any)[card.type] || {};
 
-                             // Disable playing Defuse if not in Explode pending state (logic to be added in page.tsx validation too)
                              const isPlayable = isMyTurn && !pendingAction;
-                             // Specific check for Defuse playability could be visual here too
 
                              return (
                                 <motion.div
+                                    layout
+                                    initial={{ opacity: 0, y: 50, scale: 0.5 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5, y: -50 }}
+                                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
                                     key={card.id || index}
-                                    whileHover={{ y: -40, scale: 1.1, zIndex: 10 }}
+                                    whileHover={{ y: -60, scale: 1.1, zIndex: 100, rotate: Math.random() * 4 - 2 }}
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => isPlayable && onPlayCard(card, index)}
                                     className={`relative flex-none w-36 h-52 rounded-xl shadow-2xl cursor-pointer group overflow-hidden ${!isPlayable ? 'opacity-50 grayscale' : ''}`}
+                                    style={{ marginLeft: index === 0 ? 0 : -60 }} // Overlap cards
                                 >
                                     <Image
                                         src={card.image || config.image}
@@ -412,6 +455,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                 </motion.div>
                              );
                         })}
+                        </AnimatePresence>
 
                         {!currentPlayer?.hand?.length && (
                              <div className="text-white/30 text-sm font-bold pb-8">No cards in hand</div>
