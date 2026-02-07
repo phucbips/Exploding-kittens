@@ -364,36 +364,52 @@ export default function GamePage() {
 
   // New handler for Favor flow
   const handleSelectTarget = async (targetId: string) => {
-      // User selected a target for Favor
-      if (!gameState) return;
-      const { players, turnIndex, discardPile, deck } = gameState;
-      const currentPlayer = players[turnIndex];
+      // Ensure we have pending context
+      if (!gameState || !pendingMoveRef.current) return;
 
-      // Find the Favor card in hand (first one)
-      const favorCardIndex = currentPlayer.hand.findIndex((c: Card) => c.type === 'FAVOR');
-      if (favorCardIndex === -1) return;
+      const { cards, indices } = pendingMoveRef.current;
+      const { players, discardPile } = gameState;
+
+      if (targetId === userId) {
+          alert("Không thể chọn chính mình!");
+          return;
+      }
 
       const newPlayers = [...players];
       const playerIndex = newPlayers.findIndex((p) => p.id === userId);
-      const favorCard = newPlayers[playerIndex].hand.splice(favorCardIndex, 1)[0];
+      const player = newPlayers[playerIndex];
 
-      const newDiscardPile = [...(discardPile || []), favorCard];
+      // Remove the cards that were pending
+      indices.sort((a, b) => b - a).forEach(idx => {
+          player.hand.splice(idx, 1);
+      });
 
-      // Set pending action for the TARGET player to give a card
+      const newDiscardPile = [...(discardPile || []), ...cards];
+
+      let actionType = 'favor_give';
+      if (cards.length === 2) actionType = 'pair_steal';
+      if (cards.length === 3) actionType = 'triple_steal';
+
+      // Set pending action + 3s Nope Timer
       const pendingAction = {
-          type: 'favor_give',
+          type: actionType,
           sourcePlayerId: userId,
-          targetPlayerId: targetId
+          targetPlayerId: targetId,
+          cardType: cards[0].type,
+          count: cards.length,
+          startTime: Date.now()
       };
-
-      // Don't pass turn yet! Wait for resolution.
 
       try {
         await update(ref(db, `rooms/${roomId}`), {
             players: newPlayers,
             discardPile: newDiscardPile,
-            pendingAction: pendingAction
+            pendingAction: pendingAction,
+            nopeTimer: Date.now() + 4000 // 3s + buffer
         });
+
+        // Clear the pending move only after successful update
+        pendingMoveRef.current = null;
         gameBoardRef.current?.triggerFavor(players.find((p) => p.id === targetId)?.name || 'Target');
       } catch (err: any) { console.error(err); }
   };
@@ -428,11 +444,8 @@ export default function GamePage() {
       const isTriple = cards.length === 3;
 
       if (type === 'FAVOR' || isPair || isTriple) {
-          // Enter target mode
-          // We need to store WHICH cards are being played so we can remove them after target select
-          // Ideally we move this state to Page, but for now let's hack:
-          // We tell GameBoard to enable target mode.
-          // And we keep the selected indices in GameBoard? Yes, GameBoard has `selectedIndices`.
+          // Store the intent to play these cards when a target is selected
+          pendingMoveRef.current = { cards, indices };
           gameBoardRef.current?.enableTargetMode();
       } else {
           handlePlayCard(cards, indices);
