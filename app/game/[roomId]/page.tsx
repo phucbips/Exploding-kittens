@@ -125,13 +125,41 @@ export default function GamePage() {
             player.isAlive = false;
 
             // Should we discard hand? Standard rules say discard hand + bomb.
-            newDiscardPile = [...(gameState.discardPile || []), ...player.hand, card];
+            const currentDiscard = gameState.discardPile || [];
+            const updatedDiscardPile = [...currentDiscard, ...player.hand, card];
+
+            // We need to update discardPile in the update call below, but it's not in scope of the try/catch block variables yet?
+            // Actually, we usually create a `newDiscardPile` variable at start of function, but here we can just invoke update with it directly or modify a shared var.
+            // Let's use a local var here and ensure we pass it to update.
+            // Wait, `newDiscardPile` isn't declared in this scope.
+            // I will update the `update` call logic to use this specific pile if death happens.
+
             player.hand = [];
 
             if (nextTurnsLeft <= 0) {
                 nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
                 nextTurnsLeft = 1;
             }
+
+            // We need to ensure this updated discard pile is used.
+            // The final update call uses `pendingAction`.
+            // Let's hack: we need to trigger update HERE or modify state that `update` uses.
+            // The final block just uses `pendingAction`.
+
+            const aliveCount = newPlayers.filter(p => p.isAlive).length;
+
+            try {
+                await update(ref(db, `rooms/${roomId}`), {
+                    deck: newDeck,
+                    players: newPlayers,
+                    turnIndex: nextTurnIndex,
+                    turnsLeft: nextTurnsLeft,
+                    gameState: aliveCount <= 1 ? 'ended' : gameState.gameState, // Check win here too
+                    discardPile: updatedDiscardPile,
+                    pendingAction: null
+                });
+            } catch (err) { console.error(err); }
+            return; // Exit early since we handled the death update
         }
     } else {
         player.hand = [...(player.hand || []), card];

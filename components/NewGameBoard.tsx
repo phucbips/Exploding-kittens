@@ -728,7 +728,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 <div className="w-full h-56 relative mt-6 bg-[#d2b48c]/10 backdrop-blur-md border-t border-[#d2b48c]/20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col justify-end pb-4">
                     <div className="absolute bottom-0 w-full h-8 bg-gradient-to-t from-[#0f172a] to-transparent z-0"></div>
 
-                    <div className="flex items-end justify-center px-10 overflow-x-auto overflow-y-visible hand-scroll min-h-[220px] pb-4 pt-10 scroll-smooth w-full">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: isDealingAnimation ? 0 : 1 }}
+                        className="flex items-end justify-center px-10 overflow-x-auto overflow-y-visible hand-scroll min-h-[220px] pb-4 pt-10 scroll-smooth w-full"
+                    >
 
                         {localHand.length > 0 ? (
                             <Reorder.Group
@@ -793,7 +797,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                              <div className="text-white/30 text-sm font-bold pb-8">No cards in hand</div>
                         )}
 
-                    </div>
+                    </motion.div>
                 </div>
             </footer>
         </div>
