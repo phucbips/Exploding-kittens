@@ -11,11 +11,11 @@ interface GameBoardProps {
   gameState: GameState;
   currentPlayerId: string;
   onDrawCard: () => void;
-  onPlayCard: (cards: any[], indices: number[]) => void; // Modified to accept multiple cards
+  onPlayCard: (cards: any[], indices: number[]) => void;
   onStartGame: () => void;
-  onGiveCard: (cardIndex: number) => void; // For Favor
-  onSelectTarget: (targetId: string) => void; // For Favor/Pair
-  onNope: () => void; // New Nope handler
+  onGiveCard: (cardIndex: number) => void;
+  onSelectTarget: (targetId: string) => void;
+  onNope: () => void;
   stealTarget?: {playerId: string, playerName: string, cardCount: number, type: string} | null;
   onStealCard?: (cardIndex: number) => void;
   onInsertBomb?: (index: number) => void;
@@ -32,18 +32,15 @@ const InlineBombControls = ({ deckCount, onInsert }: { deckCount: number, onInse
 
     const handleConfirm = async () => {
         setIsSubmitting(true);
-        // Small delay for animation before callback
         setTimeout(() => {
             onInsert(insertIndex);
         }, 500);
     };
 
-    // Calculate position relative to stack height (approx 208px/52 tailwind units)
     const yPercent = (insertIndex / (deckCount || 1)) * 100;
 
     return (
         <div className="absolute left-[120%] top-0 h-full flex items-start gap-4 z-[200] pointer-events-auto">
-             {/* Visual Bomb Card Sticking Out */}
              <div className="absolute -left-[140%] top-0 w-36 h-52 pointer-events-none">
                  <motion.div
                     initial={{ x: 50, opacity: 0 }}
@@ -59,7 +56,6 @@ const InlineBombControls = ({ deckCount, onInsert }: { deckCount: number, onInse
                  </motion.div>
              </div>
 
-            {/* Control Panel */}
             <motion.div
                 initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
                 className="flex flex-col gap-2 bg-slate-900/90 p-3 rounded-xl backdrop-blur-md border border-white/20 shadow-2xl mt-8"
@@ -88,10 +84,9 @@ const InlineBombControls = ({ deckCount, onInsert }: { deckCount: number, onInse
     );
 };
 
-// 3D Card Stack Component - Optimized with "Squash" and "Impact"
-// Modified to support "Messy Discard Pile" visualization
+// 3D Card Stack Component
 const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discardCards = [], isShaking = false }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void, discardCards?: any[], isShaking?: boolean }) => {
-    const thickness = Math.min(count, 20); // Clamp visual thickness
+    const thickness = Math.min(count, 20);
 
     const generateStackShadow = (size: number) => {
         let shadow = "";
@@ -107,20 +102,16 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
         </div>
     );
 
-    // Discard Pile: Render last 5 cards messily if provided
     if (type === 'discard' && discardCards && discardCards.length > 0) {
-        const visibleCards = discardCards.slice(-5); // Only show last 5 for performance/clutter
+        const visibleCards = discardCards.slice(-5);
 
         return (
             <div className="relative w-36 h-52 group cursor-pointer" onClick={onClick}>
                  {visibleCards.map((card, idx) => {
-                     // Seeded random rotation based on card ID or index
                      const seed = card.id ? card.id.charCodeAt(card.id.length - 1) : idx;
-                     const rotate = (seed % 20) - 10; // -10 to 10 deg
+                     const rotate = (seed % 20) - 10;
                      const xOffset = (seed % 10) - 5;
                      const yOffset = (seed % 10) - 5;
-
-                     const isTop = idx === visibleCards.length - 1;
 
                      return (
                          <motion.div
@@ -134,8 +125,6 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
                          </motion.div>
                      );
                  })}
-
-                 {/* Badge */}
                 <div className="absolute -top-4 -right-4 bg-yellow-400 text-black font-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-black text-sm z-50">
                   {count}
                 </div>
@@ -145,7 +134,6 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
 
     return (
         <div className="relative perspective-1000 group cursor-pointer" onClick={onClick}>
-            {/* Main Stack Container */}
             <motion.div
                 className="relative w-36 h-52 rounded-xl transition-all duration-300 ease-in-out border-2 border-white/20"
                 style={{
@@ -157,16 +145,15 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
                 animate={
                     isShaking ? {
                         x: [-2, 2, -2, 2, 0],
-                        rotateZ: [-12, -8, -12, -8, -10], // Shake around base rotation -10
+                        rotateZ: [-12, -8, -12, -8, -10],
                         transition: { duration: 0.4, repeat: 2 }
                     } : (
                         type === 'discard' ? { x: [0, -2, 2, 0], scale: [1, 1.02, 1] } : {}
                     )
                 }
                 transition={{ duration: 0.2 }}
-                key={count} // Re-trigger impact on count change for discard
+                key={count}
             >
-                {/* Top Face */}
                 <div className="absolute inset-0 w-full h-full rounded-lg overflow-hidden flex items-center justify-center bg-slate-800">
                    {type === 'draw' ? (
                      <div className="relative w-full h-full">
@@ -189,14 +176,10 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
                      </div>
                    )}
                 </div>
-
-                {/* Badge */}
                 <div className="absolute -top-4 -right-4 bg-yellow-400 text-black font-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-black text-sm z-10">
                   {count}
                 </div>
             </motion.div>
-
-            {/* Floor Shadow */}
             <div
                 className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-32 h-8 bg-black/50 blur-xl rounded-[100%] transition-all duration-500 pointer-events-none"
                 style={{ transform: `scale(${1 + thickness / 40})` }}
@@ -212,116 +195,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const currentPlayer = players[currentPlayerIndex];
   const isMyTurn = players[turnIndex]?.id === currentPlayerId && status === 'playing';
 
-  // State for multi-selection
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [localTargetMode, setLocalTargetMode] = useState<boolean>(false);
   const [localHand, setLocalHand] = useState<Card[]>([]);
   const [isGroupMode, setIsGroupMode] = useState(false);
+  const [committedCards, setCommittedCards] = useState<Card[]>([]);
 
-  // Sync local hand with game state, but only if length changed or not dragging (simplified)
-  useEffect(() => {
-      if (currentPlayer?.hand) {
-          // If lengths differ, hard sync. If content differs, sync.
-          // Ideally we trust local during drag, but hard sync on turn updates.
-          // For now, always sync when prop changes (might interrupt drag if realtime update happens).
-          setLocalHand(currentPlayer.hand);
-      }
-  }, [currentPlayer?.hand]);
-
-  const handleReorder = (newOrder: Card[]) => {
-      setLocalHand(newOrder);
-      if (onHandReorder) onHandReorder(newOrder);
-  };
-
-  const getGroupedHand = () => {
-      // Return type: Array of { type, count, cards: Card[], indices: number[] }
-      const groups: Record<string, { type: string, count: number, cards: Card[], indices: number[] }> = {};
-
-      localHand.forEach((card, idx) => {
-          if (!groups[card.type]) {
-              groups[card.type] = { type: card.type, count: 0, cards: [], indices: [] };
-          }
-          groups[card.type].count++;
-          groups[card.type].cards.push(card);
-          groups[card.type].indices.push(idx);
-      });
-
-      return Object.values(groups);
-  };
-
-  const toggleSelectGroup = (indices: number[]) => {
-       // Toggle all cards in this group
-       const allSelected = indices.every(i => selectedIndices.includes(i));
-
-       if (allSelected) {
-           setSelectedIndices(selectedIndices.filter(i => !indices.includes(i)));
-       } else {
-           const currentType = localHand[indices[0]].type;
-           const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
-           const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
-
-           if (firstSelected && firstSelected.type !== currentType) {
-               setSelectedIndices(indices);
-           } else {
-               const newSet = new Set([...selectedIndices, ...indices]);
-               setSelectedIndices(Array.from(newSet));
-           }
-       }
-  };
-
-  // Helper to toggle selection
-  const toggleSelectCard = (index: number) => {
-      // Use Index directly
-      if (selectedIndices.includes(index)) {
-          setSelectedIndices(selectedIndices.filter(i => i !== index));
-      } else {
-          // Validation
-          const card = localHand[index];
-          const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
-          const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
-
-          if (firstSelected && firstSelected.type !== card.type) {
-              setSelectedIndices([index]);
-          } else {
-              setSelectedIndices([...selectedIndices, index]);
-          }
-      }
-  };
-
-  const handlePlaySelected = () => {
-      const cards = selectedIndices.map(i => localHand[i]);
-      const type = cards[0].type;
-      const allSame = cards.every(c => c.type === type);
-
-      if (cards.length > 1 && !allSame && cards.length !== 5) {
-          alert("Cards must match (Pair/Triple) or be 5 different cards!");
-          return;
-      }
-
-      onPlayCard(cards, selectedIndices);
-      setSelectedIndices([]);
-  };
-
-  // Check if player has Nope
-  const hasNope = currentPlayer?.hand.some((c: Card) => c.type === 'NOPE');
-  const canNope = hasNope && (nopeTimer && Date.now() < nopeTimer); // Simplified, real timer logic needs hydration or server time sync
-  // Actually, we'll just check if `nopeTimer` exists in state.
-  const isNopeActive = !!nopeTimer;
-
-  // Opponents mapping (excluding self)
-  const opponents = players.filter((p: any) => p.id !== currentPlayerId);
-
-  // Avatar mapping logic
-  const AVATARS = [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBPH36HKB4gCwU1n2WR2Eu5dfaeKE-rxjsNwW6hJGRbwbayBm_Gqxc9YvfjCXTxdo4TGKUdHnwE-SZGd-hIS-IoX2RnSgqcdjlQojjkYvKrbUuZRtZDQAs5I5lXlJPPq7QUkOx5qStwQtMisldB6NDQ0kyRx_ypJcdoxnz04qwrAwTrT9M0YwCkTYQZQ9lORajrNYNEZZ3PKhIGyulFL7jc8RO_1_ZZ7c-PXpLhLneh7zNZAS9uY2WlKYmaXJddXefLLH50Sp-P", // Jumba
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuANlDGRyAn-1rwCtA1TohvPemylnZgqEg9YX7E_pyWsAnwOqlfthqzy2DtTdyA1FBEiBFoVRYbx3RWRQl4r9pgUlyclKctgFJENqQ5CDukdZouaBGls5g15HT9qUirkiZFCWtlrU1g5nGQ_PsC61_DgMADblLimS16QSPWNx5sDEwFPI6qPM8CdpRyHyAXNpIcpsBQ-lmbHiO7e15-chHnRt1Id4zXKImQ565_6ho47QQXl_tfHJt56Box4BTouZzsHtYRplhNA", // Pleakley
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAQo2gM01_Oq0iClbwr6GoBiUocH7Oa-P0llUjFkcrfMMCjBfWzfF5Fvk4Y8FQCm-JQzo6JhQWnDa_DDVPeEGhABm-zdP7CU0jx3OTQOOPo40qIwRDDC-S9_ZnFb4Xw6glqIZ3HI_9y6PQNA4DyArNifHTXrfGrD1OFoNHFquCacEfRG1rdcrJ8rfMXcq6hm6n_lFfMhs8ZLKy1W-TCjeFrSb2s5Vk2_z50QvHOfKLD1QOh2y8MMKyoBAE5tQZ7TCwhsAABEI6I", // Lilo
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBZ5xsTYfH0jSrZBvl89twgyuDoDbeWasNLQZja9hIl8Brvf-j9cLeAkyyPPGxyWR88VsFKNHN-O646R-e56ZBs72Da9OfPirDgvIaDitsDCUhRnedXWjjLippqLvI-UkURLSysY03Icmahb7xhnY9qmvH4EIm-I5PmL0abRvY-wbw2gQDwEbjkf8t_kkKyeMcYulXujLKjWUpPT_vNlgN5cXvCEzzzm_H7s1pq23DUR-h5aiU9WxDdzN4C1kBQF8U7SM4l1TtC", // Stitch
-  ];
-
-  const getAvatar = (index: number) => AVATARS[index % AVATARS.length];
-
-  // Helper for animations
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [overlayData, setOverlayData] = useState<any>(null);
   const [isDealingAnimation, setIsDealingAnimation] = useState(false);
@@ -330,7 +209,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const [drawAnimation, setDrawAnimation] = useState<{from: string, to: string} | null>(null);
   const [prevDeckLen, setPrevDeckLen] = useState(deck ? deck.length : 0);
 
-  // Trigger Shake on Explosion or Shuffle
+  useEffect(() => {
+      if (currentPlayer?.hand) {
+          setLocalHand(currentPlayer.hand);
+      }
+  }, [currentPlayer?.hand]);
+
   useEffect(() => {
     if (pendingAction?.type === 'defuse_required') {
         setIsShaking(true);
@@ -338,29 +222,22 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
     }
   }, [pendingAction?.type]);
 
-  // Trigger Dealing Animation Sequence
   useEffect(() => {
       if (isDealing) {
           setIsDealingAnimation(true);
           setDealingPhase('defuse');
-
-          // Timeline:
-          // 0s: Defuse cards fly up and deal to players (1s)
-          // 1s: Hand cards deal round-robin (4 * players * 0.2s approx)
-          // Let's calculate duration dynamically based on player count
           const defuseDuration = 1500;
-          const handDuration = players.length * 4 * 200 + 1000; // 200ms per card + buffer
+          const handDuration = players.length * 4 * 200 + 1000;
 
           setTimeout(() => setDealingPhase('hand'), defuseDuration);
           setTimeout(() => setDealingPhase('bomb'), defuseDuration + handDuration);
           setTimeout(() => {
               setDealingPhase('none');
               setIsDealingAnimation(false);
-          }, defuseDuration + handDuration + 2000); // +2s for bomb insert
+          }, defuseDuration + handDuration + 2000);
       }
   }, [isDealing, players.length]);
 
-  // Trigger Draw Animation
   useEffect(() => {
       if (deck && deck.length < prevDeckLen) {
           setDrawAnimation({ from: 'deck', to: players[turnIndex]?.id || 'unknown' });
@@ -405,52 +282,105 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
       }
   }));
 
+  const handleReorder = (newOrder: Card[]) => {
+      setLocalHand(newOrder);
+      if (onHandReorder) onHandReorder(newOrder);
+  };
+
+  const getGroupedHand = () => {
+      const groups: Record<string, { type: string, count: number, cards: Card[], indices: number[] }> = {};
+
+      localHand.forEach((card, idx) => {
+          if (!groups[card.type]) {
+              groups[card.type] = { type: card.type, count: 0, cards: [], indices: [] };
+          }
+          groups[card.type].count++;
+          groups[card.type].cards.push(card);
+          groups[card.type].indices.push(idx);
+      });
+
+      return Object.values(groups);
+  };
+
+  const toggleSelectGroup = (indices: number[]) => {
+       const allSelected = indices.every(i => selectedIndices.includes(i));
+
+       if (allSelected) {
+           setSelectedIndices(selectedIndices.filter(i => !indices.includes(i)));
+       } else {
+           const currentType = localHand[indices[0]].type;
+           const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
+           const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
+
+           if (firstSelected && firstSelected.type !== currentType) {
+               setSelectedIndices(indices);
+           } else {
+               const newSet = new Set([...selectedIndices, ...indices]);
+               setSelectedIndices(Array.from(newSet));
+           }
+       }
+  };
+
+  const toggleSelectCard = (index: number) => {
+      if (selectedIndices.includes(index)) {
+          setSelectedIndices(selectedIndices.filter(i => i !== index));
+      } else {
+          const card = localHand[index];
+          const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
+          const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
+
+          if (firstSelected && firstSelected.type !== card.type) {
+              setSelectedIndices([index]);
+          } else {
+              setSelectedIndices([...selectedIndices, index]);
+          }
+      }
+  };
+
+  const handlePlaySelected = () => {
+      const cards = selectedIndices.map(i => localHand[i]);
+      const type = cards[0].type;
+      const allSame = cards.every(c => c.type === type);
+
+      if (cards.length > 1 && !allSame && cards.length !== 5) {
+          alert("Cards must match (Pair/Triple) or be 5 different cards!");
+          return;
+      }
+
+      if (type === 'FAVOR' || (allSame && cards.length >= 2) || cards.length === 5) {
+          setCommittedCards(cards);
+      }
+
+      onPlayCard(cards, selectedIndices);
+      setSelectedIndices([]);
+  };
+
   const handleOpponentClick = (targetId: string) => {
       if (localTargetMode) {
           onSelectTarget(targetId);
           setLocalTargetMode(false);
+          setCommittedCards([]);
       }
   };
 
   const handleDrawClick = () => {
-      if (isMyTurn && !pendingAction) {
+      if (isMyTurn && !pendingAction && !localTargetMode) {
           onDrawCard();
       }
   }
 
-  // Enable target mode from parent via ref (kept for compatibility)
-  // But now we likely trigger it from play logic in parent
-  // We'll update the imperative handle to just set visual state
-  useImperativeHandle(ref, () => ({
-      // ... existing handlers ...
-      enableTargetMode: () => setLocalTargetMode(true),
-      triggerSeeFuture: (cards: any[]) => {
-          setOverlayData(cards);
-          setActiveOverlay('see_future');
-          setTimeout(() => setActiveOverlay(null), 3000);
-      },
-      triggerAttack: () => {
-          setActiveOverlay('attack');
-          setTimeout(() => setActiveOverlay(null), 2000);
-      },
-      triggerSkip: () => {
-          setActiveOverlay('skip');
-          setTimeout(() => setActiveOverlay(null), 1500);
-      },
-      triggerDefuse: () => {
-          setActiveOverlay('defuse');
-          setTimeout(() => setActiveOverlay(null), 2500);
-      },
-      triggerShuffle: () => {
-          setActiveOverlay('shuffle');
-          setTimeout(() => setActiveOverlay(null), 1500);
-      },
-      triggerFavor: (targetName: string) => {
-          setOverlayData(targetName);
-          setActiveOverlay('favor');
-          setTimeout(() => setActiveOverlay(null), 2500);
-      }
-  }));
+  const hasNope = currentPlayer?.hand.some((c: Card) => c.type === 'NOPE');
+  const isNopeActive = !!nopeTimer;
+  const opponents = players.filter((p: any) => p.id !== currentPlayerId);
+
+  const AVATARS = [
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBPH36HKB4gCwU1n2WR2Eu5dfaeKE-rxjsNwW6hJGRbwbayBm_Gqxc9YvfjCXTxdo4TGKUdHnwE-SZGd-hIS-IoX2RnSgqcdjlQojjkYvKrbUuZRtZDQAs5I5lXlJPPq7QUkOx5qStwQtMisldB6NDQ0kyRx_ypJcdoxnz04qwrAwTrT9M0YwCkTYQZQ9lORajrNYNEZZ3PKhIGyulFL7jc8RO_1_ZZ7c-PXpLhLneh7zNZAS9uY2WlKYmaXJddXefLLH50Sp-P",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuANlDGRyAn-1rwCtA1TohvPemylnZgqEg9YX7E_pyWsAnwOqlfthqzy2DtTdyA1FBEiBFoVRYbx3RWRQl4r9pgUlyclKctgFJENqQ5CDukdZouaBGls5g15HT9qUirkiZFCWtlrU1g5nGQ_PsC61_DgMADblLimS16QSPWNx5sDEwFPI6qPM8CdpRyHyAXNpIcpsBQ-lmbHiO7e15-chHnRt1Id4zXKImQ565_6ho47QQXl_tfHJt56Box4BTouZzsHtYRplhNA",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuAQo2gM01_Oq0iClbwr6GoBiUocH7Oa-P0llUjFkcrfMMCjBfWzfF5Fvk4Y8FQCm-JQzo6JhQWnDa_DDVPeEGhABm-zdP7CU0jx3OTQOOPo40qIwRDDC-S9_ZnFb4Xw6glqIZ3HI_9y6PQNA4DyArNifHTXrfGrD1OFoNHFquCacEfRG1rdcrJ8rfMXcq6hm6n_lFfMhs8ZLKy1W-TCjeFrSb2s5Vk2_z50QvHOfKLD1QOh2y8MMKyoBAE5tQZ7TCwhsAABEI6I",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBZ5xsTYfH0jSrZBvl89twgyuDoDbeWasNLQZja9hIl8Brvf-j9cLeAkyyPPGxyWR88VsFKNHN-O646R-e56ZBs72Da9OfPirDgvIaDitsDCUhRnedXWjjLippqLvI-UkURLSysY03Icmahb7xhnY9qmvH4EIm-I5PmL0abRvY-wbw2gQDwEbjkf8t_kkKyeMcYulXujLKjWUpPT_vNlgN5cXvCEzzzm_H7s1pq23DUR-h5aiU9WxDdzN4C1kBQF8U7SM4l1TtC"
+  ];
+
+  const getAvatar = (index: number) => AVATARS[index % AVATARS.length];
 
   return (
     <div className="font-display bg-tropical-night text-white h-screen w-full overflow-hidden selection:bg-plasma-cyan selection:text-black">
@@ -461,8 +391,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
             transition={{ duration: 0.4 }}
             className="relative z-10 flex flex-col h-full w-full max-w-[1920px] mx-auto"
         >
-
-            {/* TOP: Header & Opponents */}
             <header className="flex-none px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur-sm flex items-center justify-between">
                 <div className="flex items-center gap-3 w-1/4">
                     <button className="p-2 rounded-full hover:bg-white/10 transition-colors text-plasma-cyan">
@@ -501,17 +429,13 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Opponent Hand Count as Card Backs */}
                                     <div className="absolute -bottom-4 -right-8 w-12 h-16 flex items-center justify-center z-20">
-                                        {/* Simple visual of a stack */}
                                         <div className="absolute top-0 left-0 w-8 h-12 bg-red-800 rounded border border-white/30 transform -rotate-6"></div>
                                         <div className="absolute top-0 left-1 w-8 h-12 bg-red-800 rounded border border-white/30 transform rotate-6"></div>
                                         <div className="absolute top-0 left-0.5 w-8 h-12 bg-red-700 rounded border border-white/30 flex items-center justify-center z-30">
                                             <span className="font-bold text-xs text-white">{cardCount}</span>
                                         </div>
                                     </div>
-
                                 </div>
                                 <div className="text-center mt-2">
                                     <p className={`text-sm font-bold drop-shadow-md ${isTargetable ? 'text-yellow-400' : (isTurn ? 'text-plasma-cyan' : 'text-tiki-wood')}`}>{player.name}</p>
@@ -537,13 +461,26 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 </div>
             </header>
 
-            {/* MIDDLE: Play Area */}
             <main className="flex-1 flex flex-col items-center justify-center relative p-8">
-                 {/* ... Status messages ... */}
-
                  {localTargetMode && (
-                     <div className="absolute z-50 top-24 bg-yellow-500 text-black px-6 py-2 rounded-full font-bold animate-bounce shadow-lg">
-                         SELECT A PLAYER TO TARGET
+                     <div className="absolute z-50 top-24 flex flex-col items-center gap-4 pointer-events-none">
+                         <div className="bg-yellow-500 text-black px-6 py-2 rounded-full font-bold animate-bounce shadow-lg">
+                             SELECT A PLAYER TO TARGET
+                         </div>
+                         {committedCards.length > 0 && (
+                             <div className="flex gap-2">
+                                 {committedCards.map((card, idx) => (
+                                     <motion.div
+                                        key={`committed-${idx}`}
+                                        initial={{ y: 100, opacity: 0, scale: 0.5 }}
+                                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                                        className="w-16 h-24 rounded bg-slate-800 border-2 border-white/50 overflow-hidden shadow-xl"
+                                     >
+                                         <Image src={card.image || ''} alt="Card" width={64} height={96} className="object-cover w-full h-full"/>
+                                     </motion.div>
+                                 ))}
+                             </div>
+                         )}
                      </div>
                  )}
 
@@ -564,12 +501,10 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                      </div>
                  )}
 
-                 {/* Steal Card Overlay (Active Player picks from Victim) */}
                  {stealTarget && onStealCard && (
                      <div className="absolute z-50 inset-0 bg-black/90 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn p-8">
                          <h2 className="text-3xl text-yellow-400 font-bold mb-4">Pick a card from {stealTarget.playerName}!</h2>
 
-                         {/* Scrollable Container for many cards */}
                          <div className="w-full max-w-5xl max-h-[60vh] overflow-y-auto p-4 border border-white/20 rounded-xl bg-black/50 backdrop-blur">
                              <div className="flex flex-wrap gap-4 justify-center">
                                  {Array.from({ length: stealTarget.cardCount }).map((_, idx) => (
@@ -589,18 +524,13 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                      </div>
                  )}
 
-                {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
-                    {/* Dealing Animation - Phase 1: Defuse (Fly up from bottom, fan out, deal) */}
                     {isDealingAnimation && dealingPhase === 'defuse' && (
                          <div className="absolute inset-0 z-[100] pointer-events-none">
                              {players.map((p: any, idx: number) => {
                                  const isMe = p.id === currentPlayerId;
-                                 // Target positions
                                  const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
                                  const targetY = isMe ? '90%' : '10%';
-
-                                 // Fan out calculation (center bottom)
                                  const fanAngle = (idx - (players.length - 1) / 2) * 10;
                                  const fanX = 50 + (idx - (players.length - 1) / 2) * 5;
 
@@ -618,9 +548,9 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                          }}
                                          transition={{
                                              duration: 1.5,
-                                             times: [0, 0.3, 1], // 0-30% fan out, 30%-100% deal
+                                             times: [0, 0.3, 1],
                                              ease: "easeInOut",
-                                             delay: idx * 0.1 // Stagger start slightly
+                                             delay: idx * 0.1
                                          }}
                                          className="absolute w-24 h-36 rounded-lg border-2 border-green-500 shadow-[0_0_20px_rgba(0,255,0,0.5)] overflow-hidden bg-slate-800 origin-bottom"
                                      >
@@ -631,20 +561,15 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                          </div>
                     )}
 
-                    {/* Dealing Animation - Phase 2: Hand (Round Robin Deal) */}
                     {isDealingAnimation && dealingPhase === 'hand' && (
                         <div className="absolute inset-0 z-[100] pointer-events-none">
-                             {/* Generate flat list of deals: [P1-C1, P2-C1, P3-C1, P1-C2, ...] */}
                              {Array.from({ length: 4 }).flatMap((_, roundIdx) =>
                                 players.map((p: any, pIdx: number) => {
                                      const isMe = p.id === currentPlayerId;
                                      const targetX = isMe ? '50%' : `${(pIdx + 1) * (100 / (players.length + 1))}%`;
                                      const targetY = isMe ? '90%' : '10%';
-
-                                     // Calculate strict delay: (Round * Players + PlayerIndex) * speed
                                      const delay = (roundIdx * players.length + pIdx) * 0.15;
 
-                                     // Spawn from "Draw Pile" center (approx 50% left, 50% top)
                                      return (
                                          <motion.div
                                              key={`hand-${p.id}-${roundIdx}`}
@@ -661,7 +586,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         </div>
                     )}
 
-                    {/* Dealing Animation - Phase 3: Bomb Insert */}
                     {isDealingAnimation && dealingPhase === 'bomb' && (
                         <div className="absolute inset-0 z-[100] pointer-events-none flex items-center justify-center">
                             <motion.div
@@ -679,12 +603,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         </div>
                     )}
 
-                    {/* Draw Animation */}
                     {drawAnimation && (
                         <motion.div
                             initial={{ x: '50%', y: '50%', opacity: 1, scale: 1, rotate: 0 }}
                             animate={{
-                                x: drawAnimation.to === currentPlayerId ? '50%' : (players.length > 2 ? '10%' : '90%'), // Simplistic target logic
+                                x: drawAnimation.to === currentPlayerId ? '50%' : (players.length > 2 ? '10%' : '90%'),
                                 y: drawAnimation.to === currentPlayerId ? '100%' : '0%',
                                 opacity: 0,
                                 scale: 1.5,
@@ -716,27 +639,23 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                             ))}
                         </motion.div>
                     )}
-                    {/* ... other animations ... */}
                 </AnimatePresence>
 
-                {/* Hide piles during dealing animation */}
                 {!isDealingAnimation && (
                     <div className="flex items-center justify-center gap-24 w-full max-w-4xl relative z-10 animate-fadeIn">
-                        {/* Draw Pile Area */}
                         <div className={`relative flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
                             <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
                             <CardStack
                                 count={deck ? deck.length : 0}
                                 type="draw"
                                 onClick={handleDrawClick}
-                                isShaking={isShaking && activeOverlay === 'shuffle'} // Only shake draw pile on shuffle
+                                isShaking={isShaking && activeOverlay === 'shuffle'}
                             />
                             {pendingAction?.type === 'insert_bomb' && pendingAction.targetPlayerId === currentPlayerId && onInsertBomb && (
                                 <InlineBombControls deckCount={deck ? deck.length : 0} onInsert={onInsertBomb} />
                             )}
                         </div>
 
-                        {/* Discard Pile Area */}
                         <div className="flex flex-col items-center gap-4">
                             <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-magma-red transition-colors">Discard Pile</span>
                             <div className="relative w-52 h-52 flex items-center justify-center">
@@ -764,10 +683,8 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 </div>
             </main>
 
-            {/* BOTTOM: Player Hand & Controls */}
             <footer className="flex-none relative w-full flex flex-col items-center z-[100]">
                 <div className="absolute -top-20 z-30 flex items-center gap-6 pointer-events-auto">
-                    {/* NOPE BUTTON (Left) */}
                     <button
                         onClick={onNope}
                         disabled={!hasNope || !isNopeActive}
@@ -776,8 +693,10 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         NOPE
                     </button>
 
-                    {/* PLAY BUTTON (Center - appears if selected) */}
-                    {selectedIndices.length > 0 && isMyTurn && !pendingAction && (
+                    {selectedIndices.length > 0 && (
+                        (isMyTurn && !pendingAction) ||
+                        (isMyTurn && pendingAction?.type === 'defuse_required' && localHand[selectedIndices[0]]?.type === 'DEFUSE')
+                    ) && (
                         <motion.button
                             initial={{ scale: 0 }} animate={{ scale: 1 }}
                             onClick={handlePlaySelected}
@@ -787,12 +706,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         </motion.button>
                     )}
 
-                    {/* DRAW BUTTON (Right - if no selection) */}
                     {selectedIndices.length === 0 && (
                         <button
                             onClick={handleDrawClick}
-                            disabled={!isMyTurn || !!pendingAction}
-                            className={`group relative px-8 py-3 bg-slate-900 rounded-xl border border-plasma-cyan overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-all active:scale-95 ${(!isMyTurn || !!pendingAction) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={!isMyTurn || !!pendingAction || localTargetMode}
+                            className={`group relative px-8 py-3 bg-slate-900 rounded-xl border border-plasma-cyan overflow-hidden shadow-[0_0_20px_rgba(0,240,255,0.2)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-all active:scale-95 ${(!isMyTurn || !!pendingAction || localTargetMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <div className="absolute inset-0 bg-plasma-cyan/10 group-hover:bg-plasma-cyan/20 transition-colors"></div>
                             <span className="relative z-10 font-bold text-plasma-cyan tracking-widest uppercase text-sm flex items-center gap-2">
@@ -822,7 +740,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                             const isSelected = indices.some(i => selectedIndices.includes(i));
                                             const selectedCount = indices.filter(i => selectedIndices.includes(i)).length;
 
-                                            // Playable Logic for Groups
                                             let isPlayable = isMyTurn && !pendingAction;
                                             if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
                                                 isPlayable = type === 'DEFUSE';
@@ -838,7 +755,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                     className="relative w-36 h-52 group cursor-pointer"
                                                     onClick={() => isPlayable && toggleSelectGroup(indices)}
                                                 >
-                                                     {/* Stack Visual */}
                                                      <div className={`absolute inset-0 rounded-xl shadow-2xl overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'grayscale brightness-75' : ''} bg-slate-800 transition-all transform hover:-translate-y-4`}>
                                                         <Image
                                                             src={firstCard.image || config.image}
@@ -848,14 +764,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                         />
                                                      </div>
 
-                                                     {/* Count Badge */}
                                                      {cards.length > 1 && (
                                                          <div className="absolute -top-3 -right-3 bg-red-600 text-white font-black w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-lg z-50">
                                                              x{cards.length}
                                                          </div>
                                                      )}
 
-                                                     {/* Selection Badge */}
                                                      {isSelected && (
                                                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-black font-bold px-3 py-1 rounded-full shadow-lg z-50">
                                                              {selectedCount}/{cards.length}
@@ -878,7 +792,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                         const config = (CARD_TYPES as any)[card.type] || {};
                                         const isSelected = selectedIndices.includes(index);
 
-                                        // PLAYABLE LOGIC:
                                         let isPlayable = isMyTurn && !pendingAction;
 
                                         if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
@@ -889,15 +802,13 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                             }
                                         }
 
-                                        // Dynamic Squashing: More cards = more negative margin
                                         let overlap = -60;
                                         if (localHand.length > 8) overlap = -80;
                                         if (localHand.length > 15) overlap = -100;
                                         if (localHand.length > 20) overlap = -110;
 
-                                        // Fan Effect: Rotate based on distance from center
                                         const center = (localHand.length - 1) / 2;
-                                        const rotateVal = (index - center) * (localHand.length > 15 ? 2 : 4); // Flatten fan if too many
+                                        const rotateVal = (index - center) * (localHand.length > 15 ? 2 : 4);
                                         const yOffset = Math.abs(index - center) * (localHand.length > 15 ? 2 : 5) + 100;
 
                                         return (
@@ -907,7 +818,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 initial={{ opacity: 0, y: 300, scale: 0.5 }}
                                                 animate={{
                                                     opacity: 1,
-                                                    y: isSelected ? -50 : yOffset, // Tucked down by default, pop up if selected
+                                                    y: isSelected ? -50 : yOffset,
                                                     scale: 1,
                                                     zIndex: isSelected ? 300 : (200 + index),
                                                     rotate: isSelected ? 0 : rotateVal
@@ -921,8 +832,8 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 }}
                                                 whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing', rotate: 0, y: -50 }}
                                                 whileHover={{
-                                                    y: -20, // Pop up to reveal full card
-                                                    rotate: 0, // Straighten
+                                                    y: -20,
+                                                    rotate: 0,
                                                     scale: 1.1,
                                                     zIndex: 300,
                                                     transition: { duration: 0.2 }
@@ -940,7 +851,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                         fill
                                                         className="object-cover pointer-events-none"
                                                     />
-                                                    {/* Highlight */}
                                                     <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-colors pointer-events-none"></div>
                                                 </div>
                                             </Reorder.Item>
