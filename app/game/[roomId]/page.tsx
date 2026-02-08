@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ref, onValue, update, onDisconnect, remove } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, remove, serverTimestamp } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
@@ -37,8 +37,17 @@ export default function GamePage() {
 
         // Host Presence for Game Page
         if (data.players && data.players[0]?.id === storedUserId) {
+            // Remove public listing immediately
             onDisconnect(ref(db, `public_rooms/${roomId}`)).remove();
-            onDisconnect(ref(db, `rooms/${roomId}`)).remove();
+            // Mark room as potentially abandoned but wait for cleanup
+            onDisconnect(ref(db, `rooms/${roomId}`)).update({
+                hostDisconnectedAt: serverTimestamp()
+            });
+
+            // Clear disconnection flag if we are back
+            if (data.hostDisconnectedAt) {
+                update(ref(db, `rooms/${roomId}`), { hostDisconnectedAt: null });
+            }
         }
 
       } else {
@@ -55,6 +64,26 @@ export default function GamePage() {
 
     return () => unsubscribe();
   }, [roomId, router]);
+
+  // Lazy Cleanup Effect
+  useEffect(() => {
+      if (!gameState || !gameState.hostDisconnectedAt) return;
+
+      const checkCleanup = setInterval(async () => {
+          const disconnectedAt = gameState.hostDisconnectedAt;
+          if (disconnectedAt && Date.now() - disconnectedAt > 5 * 60 * 1000) {
+              // 5 minutes passed. Remove room.
+              // Any client can trigger this if they are still observing.
+              try {
+                  await remove(ref(db, `rooms/${roomId}`));
+                  alert("Room closed due to host inactivity.");
+                  router.push('/');
+              } catch (err) { console.error("Cleanup error:", err); }
+          }
+      }, 30000); // Check every 30s
+
+      return () => clearInterval(checkCleanup);
+  }, [gameState?.hostDisconnectedAt, roomId, router]);
 
   const handleCopyLink = () => {
     const link = `${window.location.origin}/?room=${roomId}`;
