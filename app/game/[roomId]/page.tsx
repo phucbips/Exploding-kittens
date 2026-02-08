@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ref, onValue, update, onDisconnect, remove, serverTimestamp } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
+import Cookies from 'js-cookie';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
 import type { GameState, Card, Player } from '@/types/game';
 
@@ -20,7 +21,12 @@ export default function GamePage() {
   const gameBoardRef = useRef<any>(null);
 
   useEffect(() => {
-    const storedUserId = sessionStorage.getItem('userId');
+    // Try Cookie first, then Session
+    let storedUserId = Cookies.get('userId');
+    if (!storedUserId) {
+        storedUserId = sessionStorage.getItem('userId') || '';
+    }
+
     if (!storedUserId) {
         router.push('/');
         return;
@@ -639,7 +645,10 @@ export default function GamePage() {
 
       // End turn logic
       let nextTurnIndex = turnIndex;
-      let nextTurnsLeft = turnsLeft; // Don't decrement again, drawing already decremented
+      // We consume 1 turn here because drawing the bomb counts as the "draw" action for that turn
+      // even though we paused to defuse.
+      // If we don't decrement, we get infinite turns on Attack stacks.
+      let nextTurnsLeft = turnsLeft - 1;
 
       if (nextTurnsLeft <= 0) {
           nextTurnIndex = getNextAlivePlayerIndex(turnIndex, players);
@@ -704,7 +713,15 @@ export default function GamePage() {
       );
   }
 
-  if (!gameState) return <div className="text-white bg-blue-900 h-screen flex items-center justify-center">Loading...</div>;
+  // Enhanced Loading State to prevent undefined access
+  if (!gameState || !gameState.players || !userId) {
+      return (
+        <div className="text-white bg-blue-900 h-screen flex items-center justify-center flex-col gap-4">
+            <div className="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+            <p className="font-bold text-lg animate-pulse">Loading Game Data...</p>
+        </div>
+      );
+  }
 
   return (
     <>
