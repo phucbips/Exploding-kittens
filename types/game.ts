@@ -39,4 +39,5 @@ export interface GameState {
   } | null;
   lastActive?: number; // Timestamp for room cleanup
   activeBomb?: Card | null;
+  hostDisconnectedAt?: number; // Timestamp when host disconnected
 }
