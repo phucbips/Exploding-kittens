@@ -120,6 +120,19 @@ export default function GamePage() {
                  bombCard: card
              };
              // Do NOT advance turn yet.
+             // Put the Bomb immediately on Discard Pile (face up on top)
+             // But keep pendingAction pointing to it.
+             const currentDiscard = gameState.discardPile || [];
+             const updatedDiscardPile = [...currentDiscard, card];
+
+             try {
+                await update(ref(db, `rooms/${roomId}`), {
+                    deck: newDeck,
+                    discardPile: updatedDiscardPile,
+                    pendingAction: newPendingAction
+                });
+             } catch (err) { console.error(err); }
+             return;
         } else {
             alert('BÙM! Bạn không có Gỡ Bom! Bạn đã bị loại!');
             player.isAlive = false;
@@ -204,25 +217,7 @@ export default function GamePage() {
         const card = cards[0];
         // Validate: Must play Defuse
         if (card.type !== 'DEFUSE') {
-             if (!confirm("Lá này không gỡ được bom! Bạn có chắc muốn đánh (vứt bỏ) nó không?")) {
-                 return;
-             }
-             // If confirmed, just discard it (below logic handles discard) but do NOT clear pending action.
-             // Wait, standard logic below sets pendingAction='play_action'.
-             // We need special handling here.
-
-             const newPlayers = [...players];
-             const playerIndex = newPlayers.findIndex((p) => p.id === userId);
-             const player = newPlayers[playerIndex];
-
-             indices.sort((a, b) => b - a).forEach(idx => player.hand.splice(idx, 1));
-             const newDiscardPile = [...(discardPile || []), ...cards];
-
-             await update(ref(db, `rooms/${roomId}`), {
-                players: newPlayers,
-                discardPile: newDiscardPile
-                // Pending action REMAINS 'defuse_required'
-             });
+             alert("Bạn phải đánh lá Gỡ Bom! Không thể đánh lá khác lúc này.");
              return;
         } else {
              // PLAYED DEFUSE!
@@ -231,16 +226,60 @@ export default function GamePage() {
              const player = newPlayers[playerIndex];
 
              indices.sort((a, b) => b - a).forEach(idx => player.hand.splice(idx, 1));
+             // Add Defuse to Discard Pile (On top of Bomb)
              const newDiscardPile = [...(discardPile || []), ...cards];
 
              // Transition to 'insert_bomb'
+             // The Bomb is currently at the top of discardPile (before we added Defuse).
+             // Wait, if we add Defuse, Bomb is buried.
+             // The bombCard is stored in pendingAction.bombCard.
+             // We need to remove the Bomb from Discard Pile?
+             // User Requirement: "gỡ bom xong người chơi được phép đặt mèo nổ vào lại chồng bài"
+             // Standard Rule: Bomb goes back to Deck. Defuse goes to Discard.
+             // So we must remove the Bomb from discardPile (where we put it in handleDrawCard)
+             // and let the pendingAction hold it until re-inserted.
+
+             // 1. Remove the Bomb from the top of discardPile (it was added in handleDrawCard)
+             // Check if top card is indeed the Bomb
+             let finalDiscardPile = [...newDiscardPile];
+             // The bomb was the LAST card before we added Defuse just now.
+             // So newDiscardPile = [...oldDiscard + bomb, ...defuse]
+             // We want finalDiscardPile = [...oldDiscard, ...defuse]
+             // And we keep bomb in pendingAction.
+
+             // Wait, handleDrawCard added Bomb to discardPile.
+             // So discardPile has Bomb at end.
+             // We just appended Defuse to it: newDiscardPile = [...discardPile, ...defuse]
+             // So Bomb is at index: newDiscardPile.length - 1 - cards.length
+             // Actually, let's just find the Bomb in the discard pile and remove it?
+             // Or assume it's the one just below the Defuse(s).
+
+             // Let's refine:
+             // discardPile (from state) has Bomb at end.
+             // We want to REMOVE that Bomb from discardPile, add Defuse to discardPile.
+             const discardWithoutBomb = [...(discardPile || [])];
+             const bombInDiscard = discardWithoutBomb.pop(); // This should be the bomb
+
+             // Verify it is the bomb (safety check)
+             let bombToInsert = pendingAction.bombCard;
+             if (bombInDiscard && bombInDiscard.type === 'EXPLODE') {
+                 // Correct, we removed it.
+                 bombToInsert = bombInDiscard;
+             } else {
+                 // Fallback: It wasn't there? Maybe race condition.
+                 // If we popped something else, put it back!
+                 if (bombInDiscard) discardWithoutBomb.push(bombInDiscard);
+             }
+
+             const pileWithDefuse = [...discardWithoutBomb, ...cards];
+
              await update(ref(db, `rooms/${roomId}`), {
                 players: newPlayers,
-                discardPile: newDiscardPile,
+                discardPile: pileWithDefuse,
                 pendingAction: {
                     type: 'insert_bomb',
                     targetPlayerId: userId,
-                    bombCard: pendingAction.bombCard
+                    bombCard: bombToInsert
                 }
              });
              return;

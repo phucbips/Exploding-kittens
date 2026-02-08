@@ -768,7 +768,23 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                 {localHand.map((card: any, index: number) => {
                                      const config = (CARD_TYPES as any)[card.type] || {};
                                      const isSelected = selectedIndices.includes(index);
-                                     const isPlayable = isMyTurn && !pendingAction;
+
+                                     // PLAYABLE LOGIC:
+                                     let isPlayable = isMyTurn && !pendingAction;
+
+                                     if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
+                                         // In defuse mode, only DEFUSE cards are playable.
+                                         // But actually, we need to allow selecting it.
+                                         // The Play Button logic will check if it can be played.
+                                         // Here we just determine if it can be clicked/selected.
+                                         isPlayable = true; // Allow selecting any card, but Play button hides if not valid?
+                                         // Better: Only highlight/enable DEFUSE cards visually?
+                                         if (card.type !== 'DEFUSE') {
+                                             isPlayable = false;
+                                         } else {
+                                             isPlayable = true;
+                                         }
+                                     }
 
                                      // Dynamic Squashing: More cards = more negative margin
                                      const overlap = localHand.length > 8 ? -90 : -60;
