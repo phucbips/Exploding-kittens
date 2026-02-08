@@ -13,7 +13,15 @@ export default function GamePage() {
   const { roomId } = useParams();
   const router = useRouter();
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [userId, setUserId] = useState<string>('');
+
+  // Initialize userId from cookie if available to prevent loading loop
+  const [userId, setUserId] = useState<string>(() => {
+      if (typeof window !== 'undefined') {
+          return Cookies.get('userId') || '';
+      }
+      return '';
+  });
+
   const [error, setError] = useState<string | null>(null);
   const [actionIntent, setActionIntent] = useState<{ type: string, cardIndices: number[] } | null>(null);
   const [stealTarget, setStealTarget] = useState<{playerId: string, playerName: string, cardCount: number, type: string} | null>(null);
@@ -21,17 +29,18 @@ export default function GamePage() {
   const gameBoardRef = useRef<any>(null);
 
   useEffect(() => {
-    // Try Cookie first, then Session
-    let storedUserId = Cookies.get('userId');
-    if (!storedUserId) {
-        storedUserId = sessionStorage.getItem('userId') || '';
+    // Try Cookie first, then Session (fallback)
+    let storedUserId = userId;
+    if (!storedUserId && typeof window !== 'undefined') {
+        storedUserId = Cookies.get('userId') || sessionStorage.getItem('userId') || '';
+        if (storedUserId) setUserId(storedUserId);
     }
 
     if (!storedUserId) {
+        // Redirect if no ID found after checks
         router.push('/');
         return;
     }
-    setUserId(storedUserId);
 
     const gameRef = ref(db, `rooms/${roomId}`);
 
@@ -69,7 +78,7 @@ export default function GamePage() {
     });
 
     return () => unsubscribe();
-  }, [roomId, router]);
+  }, [roomId, router, userId]);
 
   // Lazy Cleanup Effect
   useEffect(() => {
@@ -79,7 +88,6 @@ export default function GamePage() {
           const disconnectedAt = gameState.hostDisconnectedAt;
           if (disconnectedAt && Date.now() - disconnectedAt > 5 * 60 * 1000) {
               // 5 minutes passed. Remove room.
-              // Any client can trigger this if they are still observing.
               try {
                   await remove(ref(db, `rooms/${roomId}`));
                   alert("Room closed due to host inactivity.");
@@ -98,7 +106,6 @@ export default function GamePage() {
   };
 
   const handleStartGame = async () => {
-    // Game start is now handled in Lobby
     alert("Game already started!");
   };
 
@@ -119,7 +126,6 @@ export default function GamePage() {
 
     if (currentPlayer.id !== userId) return;
 
-    // Check if there is a pending action that prevents drawing (like being asked to give a favor card)
     if (gameState.pendingAction?.targetPlayerId === userId) {
         alert("You must resolve the pending action first!");
         return;
@@ -138,13 +144,8 @@ export default function GamePage() {
     let nextTurnIndex = turnIndex;
     let nextTurnsLeft = turnsLeft - 1;
     let newPendingAction = null;
-    let newActiveBomb = null;
 
     if (card.type === 'EXPLODE') {
-        // Player drew an Exploding Kitten!
-        // Do NOT auto-play Defuse.
-        // Set pending action to force player to resolve it.
-
         const hasDefuse = player.hand && player.hand.some((c) => c.type === 'DEFUSE');
 
         if (hasDefuse) {
@@ -154,9 +155,7 @@ export default function GamePage() {
                  targetPlayerId: userId,
                  bombCard: card
              };
-             // Do NOT advance turn yet.
-             // Put the Bomb immediately on Discard Pile (face up on top)
-             // But keep pendingAction pointing to it.
+             // Add Bomb to Discard Pile temporarily
              const currentDiscard = gameState.discardPile || [];
              const updatedDiscardPile = [...currentDiscard, card];
 
@@ -172,27 +171,14 @@ export default function GamePage() {
             alert('BÙM! Bạn không có Gỡ Bom! Bạn đã bị loại!');
             player.isAlive = false;
 
-            // Should we discard hand? Standard rules say discard hand + bomb.
             const currentDiscard = gameState.discardPile || [];
             const updatedDiscardPile = [...currentDiscard, ...player.hand, card];
-
-            // We need to update discardPile in the update call below, but it's not in scope of the try/catch block variables yet?
-            // Actually, we usually create a `newDiscardPile` variable at start of function, but here we can just invoke update with it directly or modify a shared var.
-            // Let's use a local var here and ensure we pass it to update.
-            // Wait, `newDiscardPile` isn't declared in this scope.
-            // I will update the `update` call logic to use this specific pile if death happens.
-
             player.hand = [];
 
             if (nextTurnsLeft <= 0) {
                 nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
                 nextTurnsLeft = 1;
             }
-
-            // We need to ensure this updated discard pile is used.
-            // The final update call uses `pendingAction`.
-            // Let's hack: we need to trigger update HERE or modify state that `update` uses.
-            // The final block just uses `pendingAction`.
 
             const aliveCount = newPlayers.filter(p => p.isAlive).length;
 
@@ -202,12 +188,12 @@ export default function GamePage() {
                     players: newPlayers,
                     turnIndex: nextTurnIndex,
                     turnsLeft: nextTurnsLeft,
-                    gameState: aliveCount <= 1 ? 'ended' : gameState.gameState, // Check win here too
+                    gameState: aliveCount <= 1 ? 'ended' : gameState.gameState,
                     discardPile: updatedDiscardPile,
                     pendingAction: null
                 });
             } catch (err) { console.error(err); }
-            return; // Exit early since we handled the death update
+            return;
         }
     } else {
         player.hand = [...(player.hand || []), card];
@@ -219,8 +205,6 @@ export default function GamePage() {
 
     const alivePlayers = newPlayers.filter((p) => p.isAlive);
     let newStatus = gameState.gameState;
-    // Win Condition: Only 1 player alive (and we started with > 1)
-    // Wait, newPlayers.length is total players (alive + dead).
     if (alivePlayers.length === 1 && newPlayers.length > 1) {
         newStatus = 'ended';
     }
@@ -241,69 +225,35 @@ export default function GamePage() {
 
   const handlePlayCard = async (cards: any[], indices: number[]) => {
      if (!gameState) return;
-    const { players, turnIndex, discardPile, deck, turnsLeft = 1, pendingAction, nopeTimer } = gameState;
+    const { players, turnIndex, discardPile, deck, turnsLeft = 1, pendingAction } = gameState;
     const currentPlayer = players[turnIndex];
 
-    // Allow playing Defuse if pendingAction is 'defuse_required'
     if (pendingAction?.type === 'defuse_required') {
         if (currentPlayer.id !== userId) return;
-
-        // Player is trying to resolve the bomb
         const card = cards[0];
-        // Validate: Must play Defuse
         if (card.type !== 'DEFUSE') {
              alert("Bạn phải đánh lá Gỡ Bom! Không thể đánh lá khác lúc này.");
              return;
         } else {
-             // PLAYED DEFUSE!
              const newPlayers = [...players];
              const playerIndex = newPlayers.findIndex((p) => p.id === userId);
              const player = newPlayers[playerIndex];
 
              indices.sort((a, b) => b - a).forEach(idx => player.hand.splice(idx, 1));
-             // Add Defuse to Discard Pile (On top of Bomb)
-             const newDiscardPile = [...(discardPile || []), ...cards];
 
-             // Transition to 'insert_bomb'
-             // The Bomb is currently at the top of discardPile (before we added Defuse).
-             // Wait, if we add Defuse, Bomb is buried.
-             // The bombCard is stored in pendingAction.bombCard.
-             // We need to remove the Bomb from Discard Pile?
-             // User Requirement: "gỡ bom xong người chơi được phép đặt mèo nổ vào lại chồng bài"
-             // Standard Rule: Bomb goes back to Deck. Defuse goes to Discard.
-             // So we must remove the Bomb from discardPile (where we put it in handleDrawCard)
-             // and let the pendingAction hold it until re-inserted.
+             // Remove Bomb from Discard Pile (it was added in handleDrawCard)
+             // We assume Bomb is the last card in discardPile (or near end if race condition, but usually last)
+             // AND we add Defuse to Discard Pile.
+             // Actually, we should just remove the Bomb from discard and put it in pendingAction logic?
+             // No, pendingAction already HAS the bombCard data.
 
-             // 1. Remove the Bomb from the top of discardPile (it was added in handleDrawCard)
-             // Check if top card is indeed the Bomb
-             let finalDiscardPile = [...newDiscardPile];
-             // The bomb was the LAST card before we added Defuse just now.
-             // So newDiscardPile = [...oldDiscard + bomb, ...defuse]
-             // We want finalDiscardPile = [...oldDiscard, ...defuse]
-             // And we keep bomb in pendingAction.
-
-             // Wait, handleDrawCard added Bomb to discardPile.
-             // So discardPile has Bomb at end.
-             // We just appended Defuse to it: newDiscardPile = [...discardPile, ...defuse]
-             // So Bomb is at index: newDiscardPile.length - 1 - cards.length
-             // Actually, let's just find the Bomb in the discard pile and remove it?
-             // Or assume it's the one just below the Defuse(s).
-
-             // Let's refine:
-             // discardPile (from state) has Bomb at end.
-             // We want to REMOVE that Bomb from discardPile, add Defuse to discardPile.
              const discardWithoutBomb = [...(discardPile || [])];
-             const bombInDiscard = discardWithoutBomb.pop(); // This should be the bomb
+             // Find the specific bomb card if possible, or just pop the last one if it matches
+             const bombCandidate = discardWithoutBomb[discardWithoutBomb.length - 1];
 
-             // Verify it is the bomb (safety check)
-             let bombToInsert = pendingAction.bombCard;
-             if (bombInDiscard && bombInDiscard.type === 'EXPLODE') {
-                 // Correct, we removed it.
-                 bombToInsert = bombInDiscard;
-             } else {
-                 // Fallback: It wasn't there? Maybe race condition.
-                 // If we popped something else, put it back!
-                 if (bombInDiscard) discardWithoutBomb.push(bombInDiscard);
+             // Safety: Only remove if it looks like a bomb.
+             if (bombCandidate && bombCandidate.type === 'EXPLODE') {
+                 discardWithoutBomb.pop();
              }
 
              const pileWithDefuse = [...discardWithoutBomb, ...cards];
@@ -314,7 +264,7 @@ export default function GamePage() {
                 pendingAction: {
                     type: 'insert_bomb',
                     targetPlayerId: userId,
-                    bombCard: bombToInsert
+                    bombCard: pendingAction.bombCard
                 }
              });
              return;
@@ -331,26 +281,16 @@ export default function GamePage() {
         return;
     }
 
-    // Multi-card Logic (Pair/Triple)
     const card = cards[0];
     const isPair = cards.length === 2 && cards[0].type === cards[1].type;
     const isTriple = cards.length === 3 && cards[0].type === cards[1].type && cards[1].type === cards[2].type;
-    const isSpecial = cards.length === 5; // 5 diff cards = reclaim discard (advanced)
+    const isSpecial = cards.length === 5;
 
-    // Flexible Play: Allow single cards even if "useless" (like Cat cards)
-    // Warn if playing single useless card
     const isActionCard = ['ATTACK', 'SKIP', 'SHUFFLE', 'SEE_FUTURE', 'FAVOR'].includes(card.type);
     if (cards.length === 1 && !isActionCard && card.type !== 'EXPLODE' && card.type !== 'DEFUSE') {
          if (!confirm("Lá bài này không có chức năng gì khi đánh lẻ. Bạn có chắc muốn đánh không?")) {
              return;
          }
-    }
-
-    // Warn if playing Defuse when not needed
-    if (cards.length === 1 && card.type === 'DEFUSE') {
-        if (!confirm("Bạn đang đánh lá Gỡ Bom dù không bị nổ. Bạn có chắc không?")) {
-            return;
-        }
     }
 
     if (cards.length > 1 && !isPair && !isTriple && !isSpecial) {
@@ -362,18 +302,11 @@ export default function GamePage() {
     const playerIndex = newPlayers.findIndex((p) => p.id === userId);
     const player = newPlayers[playerIndex];
 
-    // Remove cards from hand (indices must be sorted desc to avoid shift issues)
     indices.sort((a, b) => b - a).forEach(idx => {
         player.hand.splice(idx, 1);
     });
 
     const newDiscardPile = [...(discardPile || []), ...cards];
-
-    // UNTARGETED ACTIONS (Skip, Attack, Shuffle, SeeFuture, Nope, etc)
-    // If it's a "useless" single play, we treat it as a play_action that does nothing?
-    // Or just set pendingAction to null?
-    // We should probably set it to play_action so Nope can cancel it (technically you can Nope a useless play to save the card? No, you Nope the ACTION. Useless play has no action).
-    // But let's just commit the state.
 
     let pending = null;
     let nopeTimerVal = null;
@@ -381,7 +314,7 @@ export default function GamePage() {
     if (isActionCard || isPair || isTriple || isSpecial) {
         pending = {
             type: 'play_action',
-            cardType: isPair ? 'PAIR' : (isTriple ? 'TRIPLE' : card.type), // Simplify logic
+            cardType: isPair ? 'PAIR' : (isTriple ? 'TRIPLE' : card.type),
             count: cards.length,
             sourcePlayerId: userId,
             startTime: Date.now()
@@ -404,7 +337,6 @@ export default function GamePage() {
   const handleNope = async () => {
       if (!gameState || !gameState.pendingAction) return;
 
-      // Check if user has Nope
       const playerIndex = gameState.players.findIndex(p => p.id === userId);
       const player = gameState.players[playerIndex];
       const nopeIndex = player.hand.findIndex(c => c.type === 'NOPE');
@@ -415,13 +347,6 @@ export default function GamePage() {
       const nopeCard = newPlayers[playerIndex].hand.splice(nopeIndex, 1)[0];
       const newDiscardPile = [...(gameState.discardPile || []), nopeCard];
 
-      // Logic: If pendingAction is 'play_action', we cancel it.
-      // If it was already Noped (how to track?), we might re-enable it?
-      // "YUP" card? Standard rules: Nope cancels Nope.
-      // We need to track `nopeCount` in pendingAction?
-
-      // Simplified: If pendingAction exists, Nope cancels it and clears pendingAction.
-      // Unless it's an Explode? (Nope can't stop explode).
       if (gameState.pendingAction.type === 'explode') return;
 
       try {
@@ -435,16 +360,12 @@ export default function GamePage() {
       } catch (err) { console.error(err); }
   };
 
-  // Effect to execute pending actions after timer
   useEffect(() => {
       if (!gameState || !gameState.nopeTimer || !gameState.pendingAction) return;
-      if (gameState.players[gameState.turnIndex].id !== userId) return; // Only host/turn owner executes?
-      // Actually better if the turn owner executes their own action to avoid race conditions.
-      // But if it's Noped, action is null.
+      if (gameState.players[gameState.turnIndex].id !== userId) return;
 
       const timeLeft = gameState.nopeTimer - Date.now();
       if (timeLeft <= 0) {
-          // Timer expired! Execute Action.
           executePendingAction();
       } else {
           const timer = setTimeout(() => {
@@ -458,7 +379,6 @@ export default function GamePage() {
       if (!gameState || !gameState.pendingAction) return;
       const { pendingAction, turnIndex, players, deck, turnsLeft = 1 } = gameState;
 
-      // Execute Logic based on pendingAction.cardType
       let nextTurnIndex = turnIndex;
       let nextTurnsLeft = turnsLeft;
       let currentDeck = deck ? [...deck] : [];
@@ -471,7 +391,7 @@ export default function GamePage() {
                 gameBoardRef.current?.triggerSkip();
                 break;
             case 'ATTACK':
-                nextTurnsLeft = 0;
+                nextTurnsLeft = 0; // End current turns
                 gameBoardRef.current?.triggerAttack();
                 break;
             case 'SHUFFLE':
@@ -492,13 +412,10 @@ export default function GamePage() {
             if (targetIndex !== -1 && sourceIndex !== -1) {
                 const targetHand = newPlayers[targetIndex].hand;
                 if (targetHand && targetHand.length > 0) {
-                     let indexToSteal = (pendingAction as any).targetCardIndex; // Use specific index if provided
-
-                     // Fallback to random if index invalid (safety)
+                     let indexToSteal = (pendingAction as any).targetCardIndex;
                      if (indexToSteal === undefined || indexToSteal < 0 || indexToSteal >= targetHand.length) {
                          indexToSteal = Math.floor(Math.random() * targetHand.length);
                      }
-
                      const stolenCard = newPlayers[targetIndex].hand.splice(indexToSteal, 1)[0];
                      newPlayers[sourceIndex].hand.push(stolenCard);
                 }
@@ -520,7 +437,6 @@ export default function GamePage() {
       });
   };
 
-  // New handler for Favor/Pair/Triple flow
   const handleSelectTarget = async (targetId: string) => {
       if (!gameState || !actionIntent) return;
       const { players, discardPile } = gameState;
@@ -531,7 +447,6 @@ export default function GamePage() {
 
       if (targetIndex === -1) return;
 
-      // Remove played cards from hand based on stored intent
       const playedCards: Card[] = [];
       [...actionIntent.cardIndices].sort((a, b) => b - a).forEach(idx => {
           if (newPlayers[playerIndex].hand[idx]) {
@@ -572,7 +487,6 @@ export default function GamePage() {
                   type: actionIntent.type
               });
 
-              // Update Hand and Discard (Effectively Playing the Cards)
               await update(ref(db, `rooms/${roomId}`), {
                   players: newPlayers,
                   discardPile: newDiscardPile
@@ -586,11 +500,10 @@ export default function GamePage() {
   };
 
   const handleGiveCard = async (cardIndex: number) => {
-      // Target player selects a card to give
       if (!gameState || !gameState.pendingAction) return;
       const { players, pendingAction } = gameState;
 
-      if (pendingAction.targetPlayerId !== userId) return; // Security check
+      if (pendingAction.targetPlayerId !== userId) return;
 
       const newPlayers = [...players];
       const giverIndex = newPlayers.findIndex((p) => p.id === userId);
@@ -602,7 +515,7 @@ export default function GamePage() {
       try {
         await update(ref(db, `rooms/${roomId}`), {
             players: newPlayers,
-            pendingAction: null // Clear action
+            pendingAction: null
         });
         alert(`Bạn đã đưa lá ${cardToGive.name} cho đối thủ.`);
       } catch (err: any) { console.error(err); }
@@ -635,19 +548,10 @@ export default function GamePage() {
       const bombCard = (pendingAction as any).bombCard;
       const newDeck = [...(deck || [])];
 
-      // Calculate real index (from top or bottom? Array is usually treated as a stack where pop() is top)
-      // If we render Deck in UI as a stack, the "Top" is the end of the array.
-      // So index 0 from top = newDeck.length. index 1 = newDeck.length - 1.
-      // User UI says "Position X from Top".
-
       const realIndex = Math.max(0, newDeck.length - insertIndex);
       newDeck.splice(realIndex, 0, bombCard);
 
-      // End turn logic
       let nextTurnIndex = turnIndex;
-      // We consume 1 turn here because drawing the bomb counts as the "draw" action for that turn
-      // even though we paused to defuse.
-      // If we don't decrement, we get infinite turns on Attack stacks.
       let nextTurnsLeft = turnsLeft - 1;
 
       if (nextTurnsLeft <= 0) {
@@ -673,7 +577,6 @@ export default function GamePage() {
 
       newPlayers[playerIndex].hand = newHand;
 
-      // Update directly (no debounce for MVP, Firebase handles small writes well)
       try {
           await update(ref(db, `rooms/${roomId}/players/${playerIndex}`), {
               hand: newHand
@@ -683,7 +586,6 @@ export default function GamePage() {
       }
   };
 
-  // Modified UI Handler to intercept Targeted Cards
   const onUIPlayCard = (cards: any[], indices: number[]) => {
       const type = cards[0].type;
       const isPair = cards.length === 2 && cards[0].type === cards[1].type;
@@ -713,7 +615,8 @@ export default function GamePage() {
       );
   }
 
-  // Enhanced Loading State to prevent undefined access
+  // Enhanced Loading State
+  // We check for gameState.players existing to ensure we have data.
   if (!gameState || !gameState.players || !userId) {
       return (
         <div className="text-white bg-blue-900 h-screen flex items-center justify-center flex-col gap-4">
