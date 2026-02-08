@@ -99,6 +99,18 @@ export default function GamePage() {
       return () => clearInterval(checkCleanup);
   }, [gameState?.hostDisconnectedAt, roomId, router]);
 
+  // Auto-clear dealing state to ensure Host can play
+  useEffect(() => {
+      if (gameState && gameState.isDealing && gameState.players && gameState.players[0].id === userId) {
+             const timer = setTimeout(() => {
+                  // Only update if still dealing
+                  update(ref(db, `rooms/${roomId}`), { isDealing: false })
+                    .catch(err => console.error("Error clearing dealing state:", err));
+             }, 8000); // 8s safety buffer for animation
+             return () => clearTimeout(timer);
+      }
+  }, [gameState?.isDealing, userId, roomId]); // Dependency on isDealing ensures it only runs when needed
+
   const handleCopyLink = () => {
     const link = `${window.location.origin}/?room=${roomId}`;
     navigator.clipboard.writeText(link);
