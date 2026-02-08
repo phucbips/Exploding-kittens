@@ -535,13 +535,13 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                  return (
                                      <motion.div
                                          key={`defuse-${p.id}`}
-                                         initial={{ bottom: '-20%', left: '50%', x: '-50%', rotate: 0, scale: 0.8, opacity: 0 }}
+                                         initial={{ bottom: '-20%', left: '50%', x: '-50%', rotate: 0, scale: 1.3, opacity: 0 }}
                                          animate={{
                                              bottom: ['-20%', '20%', 'auto'],
                                              top: ['auto', 'auto', targetY],
                                              left: ['50%', `${fanX}%`, targetX],
                                              rotate: [0, fanAngle, 0],
-                                             scale: [0.8, 1, 0.6],
+                                             scale: [1.3, 1.3, 0.6],
                                              opacity: [0, 1, 0]
                                          }}
                                          transition={{
@@ -572,10 +572,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                      // Calculate strict delay: (Round * Players + PlayerIndex) * speed
                                      const delay = (roundIdx * players.length + pIdx) * 0.15;
 
+                                     // Spawn from "Draw Pile" center (approx 50% left, 50% top)
                                      return (
                                          <motion.div
                                              key={`hand-${p.id}-${roundIdx}`}
-                                             initial={{ top: '-10%', left: '50%', scale: 1, opacity: 1, x: '-50%' }}
+                                             initial={{ top: '50%', left: '50%', scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
                                              animate={{ top: targetY, left: targetX, scale: 0.5, opacity: 0, rotate: 360 }}
                                              transition={{ duration: 0.4, delay: delay, ease: "linear" }}
                                              className="absolute w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800"
@@ -748,19 +749,24 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                      const isPlayable = isMyTurn && !pendingAction;
 
                                      // Dynamic Squashing: More cards = more negative margin
-                                     const overlap = localHand.length > 8 ? -80 : -60;
+                                     const overlap = localHand.length > 8 ? -90 : -60;
+
+                                     // Fan Effect: Rotate based on distance from center
+                                     const center = (localHand.length - 1) / 2;
+                                     const rotateVal = (index - center) * 4; // 4 degrees per step
+                                     const yOffset = Math.abs(index - center) * 5 + 100; // Curve + Tucked down (100px)
 
                                      return (
                                         <Reorder.Item
                                             key={card.id}
                                             value={card}
-                                            initial={{ opacity: 0, y: 200, scale: 0.5 }}
+                                            initial={{ opacity: 0, y: 300, scale: 0.5 }}
                                             animate={{
                                                 opacity: 1,
-                                                y: isSelected ? -80 : 0,
+                                                y: isSelected ? -50 : yOffset, // Tucked down by default, pop up if selected
                                                 scale: 1,
-                                                zIndex: isSelected ? 100 : index, // Ensure stacking order
-                                                rotate: 0
+                                                zIndex: isSelected ? 100 : index,
+                                                rotate: isSelected ? 0 : rotateVal
                                             }}
                                             exit={{
                                                 opacity: 0,
@@ -769,15 +775,20 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 rotate: Math.random() * 360,
                                                 transition: { duration: 0.5 }
                                             }}
-                                            whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing' }}
+                                            whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing', rotate: 0, y: -50 }}
+                                            whileHover={{
+                                                y: -20, // Pop up to reveal full card
+                                                rotate: 0, // Straighten
+                                                scale: 1.1,
+                                                zIndex: 200,
+                                                transition: { duration: 0.2 }
+                                            }}
                                             className="relative flex-none w-36 h-52 touch-none"
                                             style={{ marginLeft: index === 0 ? 0 : overlap }}
                                         >
-                                            <motion.div
-                                                whileHover={{ y: isSelected ? -90 : -60, scale: 1.1, zIndex: 200, rotate: Math.random() * 4 - 2 }}
-                                                whileTap={{ scale: 0.95 }}
+                                            <div
                                                 onClick={() => isPlayable && toggleSelectCard(card.id, index)}
-                                                className={`w-full h-full rounded-xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'opacity-50 grayscale' : ''} bg-slate-800`}
+                                                className={`w-full h-full rounded-xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'grayscale brightness-75' : ''} bg-slate-800 transition-colors`}
                                             >
                                                 <Image
                                                     src={card.image || config.image}
@@ -787,7 +798,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 />
                                                 {/* Highlight */}
                                                 <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-colors pointer-events-none"></div>
-                                            </motion.div>
+                                            </div>
                                         </Reorder.Item>
                                      );
                                 })}
