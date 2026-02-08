@@ -90,7 +90,7 @@ const InlineBombControls = ({ deckCount, onInsert }: { deckCount: number, onInse
 
 // 3D Card Stack Component - Optimized with "Squash" and "Impact"
 // Modified to support "Messy Discard Pile" visualization
-const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discardCards = [] }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void, discardCards?: any[] }) => {
+const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discardCards = [], isShaking = false }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void, discardCards?: any[], isShaking?: boolean }) => {
     const thickness = Math.min(count, 20); // Clamp visual thickness
 
     const generateStackShadow = (size: number) => {
@@ -154,7 +154,15 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
                     transform: `rotateX(25deg) rotateZ(-10deg) translateY(${-thickness}px)`,
                 }}
                 whileTap={type === 'draw' ? { scaleY: 0.9, scaleX: 1.05, translateY: 5 } : {}}
-                animate={type === 'discard' ? { x: [0, -2, 2, 0], scale: [1, 1.02, 1] } : {}}
+                animate={
+                    isShaking ? {
+                        x: [-2, 2, -2, 2, 0],
+                        rotateZ: [-12, -8, -12, -8, -10], // Shake around base rotation -10
+                        transition: { duration: 0.4, repeat: 2 }
+                    } : (
+                        type === 'discard' ? { x: [0, -2, 2, 0], scale: [1, 1.02, 1] } : {}
+                    )
+                }
                 transition={{ duration: 0.2 }}
                 key={count} // Re-trigger impact on count change for discard
             >
@@ -208,6 +216,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [localTargetMode, setLocalTargetMode] = useState<boolean>(false);
   const [localHand, setLocalHand] = useState<Card[]>([]);
+  const [isGroupMode, setIsGroupMode] = useState(false);
 
   // Sync local hand with game state, but only if length changed or not dragging (simplified)
   useEffect(() => {
@@ -224,13 +233,45 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
       if (onHandReorder) onHandReorder(newOrder);
   };
 
-  // Helper to toggle selection
-  const toggleSelectCard = (cardId: string, index: number) => {
-      // We use Card ID or Index. If reordered, Index changes.
-      // Ideally track by ID. But play logic uses indices for removal.
-      // We must map current local indices back to the "real" hand?
-      // Actually, if we reorder in backend, indices match.
+  const getGroupedHand = () => {
+      // Return type: Array of { type, count, cards: Card[], indices: number[] }
+      const groups: Record<string, { type: string, count: number, cards: Card[], indices: number[] }> = {};
 
+      localHand.forEach((card, idx) => {
+          if (!groups[card.type]) {
+              groups[card.type] = { type: card.type, count: 0, cards: [], indices: [] };
+          }
+          groups[card.type].count++;
+          groups[card.type].cards.push(card);
+          groups[card.type].indices.push(idx);
+      });
+
+      return Object.values(groups);
+  };
+
+  const toggleSelectGroup = (indices: number[]) => {
+       // Toggle all cards in this group
+       const allSelected = indices.every(i => selectedIndices.includes(i));
+
+       if (allSelected) {
+           setSelectedIndices(selectedIndices.filter(i => !indices.includes(i)));
+       } else {
+           const currentType = localHand[indices[0]].type;
+           const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
+           const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
+
+           if (firstSelected && firstSelected.type !== currentType) {
+               setSelectedIndices(indices);
+           } else {
+               const newSet = new Set([...selectedIndices, ...indices]);
+               setSelectedIndices(Array.from(newSet));
+           }
+       }
+  };
+
+  // Helper to toggle selection
+  const toggleSelectCard = (index: number) => {
+      // Use Index directly
       if (selectedIndices.includes(index)) {
           setSelectedIndices(selectedIndices.filter(i => i !== index));
       } else {
@@ -482,6 +523,14 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 </div>
 
                 <div className="flex items-center justify-end gap-3 w-1/4">
+                    <button
+                        onClick={() => setIsGroupMode(!isGroupMode)}
+                        className={`p-2 rounded-lg transition-colors flex items-center gap-2 ${isGroupMode ? 'bg-plasma-cyan text-black' : 'hover:bg-white/10 text-white/70'}`}
+                        title="Toggle Group View"
+                    >
+                        <span className="material-symbols-outlined">filter_none</span>
+                        {isGroupMode && <span className="text-xs font-bold">GROUPED</span>}
+                    </button>
                     <button className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/70">
                         <span className="material-symbols-outlined">settings</span>
                     </button>
@@ -517,20 +566,24 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                  {/* Steal Card Overlay (Active Player picks from Victim) */}
                  {stealTarget && onStealCard && (
-                     <div className="absolute z-50 inset-0 bg-black/90 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn">
+                     <div className="absolute z-50 inset-0 bg-black/90 flex flex-col items-center justify-center pointer-events-auto animate-fadeIn p-8">
                          <h2 className="text-3xl text-yellow-400 font-bold mb-4">Pick a card from {stealTarget.playerName}!</h2>
-                         <div className="flex flex-wrap gap-4 justify-center max-w-3xl p-4">
-                             {Array.from({ length: stealTarget.cardCount }).map((_, idx) => (
-                                 <motion.div
-                                    key={idx}
-                                    whileHover={{ scale: 1.1, translateY: -10 }}
-                                    onClick={() => onStealCard(idx)}
-                                    className="w-24 h-36 bg-red-900 rounded-lg border-2 border-white/30 cursor-pointer shadow-lg relative overflow-hidden"
-                                 >
-                                      <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
-                                      <div className="absolute inset-0 bg-black/20 hover:bg-transparent transition-colors"></div>
-                                 </motion.div>
-                             ))}
+
+                         {/* Scrollable Container for many cards */}
+                         <div className="w-full max-w-5xl max-h-[60vh] overflow-y-auto p-4 border border-white/20 rounded-xl bg-black/50 backdrop-blur">
+                             <div className="flex flex-wrap gap-4 justify-center">
+                                 {Array.from({ length: stealTarget.cardCount }).map((_, idx) => (
+                                     <motion.div
+                                        key={idx}
+                                        whileHover={{ scale: 1.1, translateY: -10 }}
+                                        onClick={() => onStealCard(idx)}
+                                        className="w-20 h-32 bg-red-900 rounded-lg border-2 border-white/30 cursor-pointer shadow-lg relative overflow-hidden flex-shrink-0"
+                                     >
+                                          <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
+                                          <div className="absolute inset-0 bg-black/20 hover:bg-transparent transition-colors"></div>
+                                     </motion.div>
+                                 ))}
+                             </div>
                          </div>
                          <p className="text-white/50 mt-4">Click a card back to steal it.</p>
                      </div>
@@ -676,6 +729,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                 count={deck ? deck.length : 0}
                                 type="draw"
                                 onClick={handleDrawClick}
+                                isShaking={isShaking && activeOverlay === 'shuffle'} // Only shake draw pile on shuffle
                             />
                             {pendingAction?.type === 'insert_bomb' && pendingAction.targetPlayerId === currentPlayerId && onInsertBomb && (
                                 <InlineBombControls deckCount={deck ? deck.length : 0} onInsert={onInsertBomb} />
@@ -758,90 +812,143 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     >
 
                         {localHand.length > 0 ? (
-                            <Reorder.Group
-                                axis="x"
-                                values={localHand}
-                                onReorder={handleReorder}
-                                className="flex items-end justify-center min-w-max px-20"
-                            >
-                                <AnimatePresence mode='popLayout'>
-                                {localHand.map((card: any, index: number) => {
-                                     const config = (CARD_TYPES as any)[card.type] || {};
-                                     const isSelected = selectedIndices.includes(index);
+                            isGroupMode ? (
+                                <div className="flex items-end justify-center gap-4 px-20">
+                                    <AnimatePresence mode="popLayout">
+                                        {getGroupedHand().map((group) => {
+                                            const { type, cards, indices } = group;
+                                            const firstCard = cards[0];
+                                            const config = (CARD_TYPES as any)[type] || {};
+                                            const isSelected = indices.some(i => selectedIndices.includes(i));
+                                            const selectedCount = indices.filter(i => selectedIndices.includes(i)).length;
 
-                                     // PLAYABLE LOGIC:
-                                     let isPlayable = isMyTurn && !pendingAction;
+                                            // Playable Logic for Groups
+                                            let isPlayable = isMyTurn && !pendingAction;
+                                            if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
+                                                isPlayable = type === 'DEFUSE';
+                                            }
 
-                                     if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
-                                         // In defuse mode, only DEFUSE cards are playable.
-                                         // But actually, we need to allow selecting it.
-                                         // The Play Button logic will check if it can be played.
-                                         // Here we just determine if it can be clicked/selected.
-                                         isPlayable = true; // Allow selecting any card, but Play button hides if not valid?
-                                         // Better: Only highlight/enable DEFUSE cards visually?
-                                         if (card.type !== 'DEFUSE') {
-                                             isPlayable = false;
-                                         } else {
-                                             isPlayable = true;
-                                         }
-                                     }
+                                            return (
+                                                <motion.div
+                                                    key={`group-${type}`}
+                                                    layout
+                                                    initial={{ scale: 0.8, opacity: 0 }}
+                                                    animate={{ scale: 1, opacity: 1 }}
+                                                    exit={{ scale: 0, opacity: 0 }}
+                                                    className="relative w-36 h-52 group cursor-pointer"
+                                                    onClick={() => isPlayable && toggleSelectGroup(indices)}
+                                                >
+                                                     {/* Stack Visual */}
+                                                     <div className={`absolute inset-0 rounded-xl shadow-2xl overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'grayscale brightness-75' : ''} bg-slate-800 transition-all transform hover:-translate-y-4`}>
+                                                        <Image
+                                                            src={firstCard.image || config.image}
+                                                            alt={config.name || 'Card'}
+                                                            fill
+                                                            className="object-cover pointer-events-none"
+                                                        />
+                                                     </div>
 
-                                     // Dynamic Squashing: More cards = more negative margin
-                                     const overlap = localHand.length > 8 ? -90 : -60;
+                                                     {/* Count Badge */}
+                                                     {cards.length > 1 && (
+                                                         <div className="absolute -top-3 -right-3 bg-red-600 text-white font-black w-8 h-8 rounded-full flex items-center justify-center border-2 border-white shadow-lg z-50">
+                                                             x{cards.length}
+                                                         </div>
+                                                     )}
 
-                                     // Fan Effect: Rotate based on distance from center
-                                     const center = (localHand.length - 1) / 2;
-                                     const rotateVal = (index - center) * 4; // 4 degrees per step
-                                     const yOffset = Math.abs(index - center) * 5 + 100; // Curve + Tucked down (100px)
+                                                     {/* Selection Badge */}
+                                                     {isSelected && (
+                                                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-black font-bold px-3 py-1 rounded-full shadow-lg z-50">
+                                                             {selectedCount}/{cards.length}
+                                                         </div>
+                                                     )}
+                                                </motion.div>
+                                            )
+                                        })}
+                                    </AnimatePresence>
+                                </div>
+                            ) : (
+                                <Reorder.Group
+                                    axis="x"
+                                    values={localHand}
+                                    onReorder={handleReorder}
+                                    className="flex items-end justify-center min-w-max px-20"
+                                >
+                                    <AnimatePresence mode='popLayout'>
+                                    {localHand.map((card: any, index: number) => {
+                                        const config = (CARD_TYPES as any)[card.type] || {};
+                                        const isSelected = selectedIndices.includes(index);
 
-                                     return (
-                                        <Reorder.Item
-                                            key={card.id}
-                                            value={card}
-                                            initial={{ opacity: 0, y: 300, scale: 0.5 }}
-                                            animate={{
-                                                opacity: 1,
-                                                y: isSelected ? -50 : yOffset, // Tucked down by default, pop up if selected
-                                                scale: 1,
-                                                zIndex: isSelected ? 300 : (200 + index),
-                                                rotate: isSelected ? 0 : rotateVal
-                                            }}
-                                            exit={{
-                                                opacity: 0,
-                                                y: -400,
-                                                scale: 0.2,
-                                                rotate: Math.random() * 360,
-                                                transition: { duration: 0.5 }
-                                            }}
-                                            whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing', rotate: 0, y: -50 }}
-                                            whileHover={{
-                                                y: -20, // Pop up to reveal full card
-                                                rotate: 0, // Straighten
-                                                scale: 1.1,
-                                                zIndex: 300,
-                                                transition: { duration: 0.2 }
-                                            }}
-                                            className="relative flex-none w-36 h-52 touch-none"
-                                            style={{ marginLeft: index === 0 ? 0 : overlap }}
-                                        >
-                                            <div
-                                                onClick={() => isPlayable && toggleSelectCard(card.id, index)}
-                                                className={`w-full h-full rounded-xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'grayscale brightness-75' : ''} bg-slate-800 transition-colors`}
+                                        // PLAYABLE LOGIC:
+                                        let isPlayable = isMyTurn && !pendingAction;
+
+                                        if (status === 'playing' && pendingAction?.type === 'defuse_required' && currentPlayerId === players[turnIndex]?.id) {
+                                            if (card.type !== 'DEFUSE') {
+                                                isPlayable = false;
+                                            } else {
+                                                isPlayable = true;
+                                            }
+                                        }
+
+                                        // Dynamic Squashing: More cards = more negative margin
+                                        let overlap = -60;
+                                        if (localHand.length > 8) overlap = -80;
+                                        if (localHand.length > 15) overlap = -100;
+                                        if (localHand.length > 20) overlap = -110;
+
+                                        // Fan Effect: Rotate based on distance from center
+                                        const center = (localHand.length - 1) / 2;
+                                        const rotateVal = (index - center) * (localHand.length > 15 ? 2 : 4); // Flatten fan if too many
+                                        const yOffset = Math.abs(index - center) * (localHand.length > 15 ? 2 : 5) + 100;
+
+                                        return (
+                                            <Reorder.Item
+                                                key={card.id}
+                                                value={card}
+                                                initial={{ opacity: 0, y: 300, scale: 0.5 }}
+                                                animate={{
+                                                    opacity: 1,
+                                                    y: isSelected ? -50 : yOffset, // Tucked down by default, pop up if selected
+                                                    scale: 1,
+                                                    zIndex: isSelected ? 300 : (200 + index),
+                                                    rotate: isSelected ? 0 : rotateVal
+                                                }}
+                                                exit={{
+                                                    opacity: 0,
+                                                    y: -400,
+                                                    scale: 0.2,
+                                                    rotate: Math.random() * 360,
+                                                    transition: { duration: 0.5 }
+                                                }}
+                                                whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing', rotate: 0, y: -50 }}
+                                                whileHover={{
+                                                    y: -20, // Pop up to reveal full card
+                                                    rotate: 0, // Straighten
+                                                    scale: 1.1,
+                                                    zIndex: 300,
+                                                    transition: { duration: 0.2 }
+                                                }}
+                                                className="relative flex-none w-36 h-52 touch-none"
+                                                style={{ marginLeft: index === 0 ? 0 : overlap }}
                                             >
-                                                <Image
-                                                    src={card.image || config.image}
-                                                    alt={config.name || 'Card'}
-                                                    fill
-                                                    className="object-cover pointer-events-none"
-                                                />
-                                                {/* Highlight */}
-                                                <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-colors pointer-events-none"></div>
-                                            </div>
-                                        </Reorder.Item>
-                                     );
-                                })}
-                                </AnimatePresence>
-                            </Reorder.Group>
+                                                <div
+                                                    onClick={() => isPlayable && toggleSelectCard(index)}
+                                                    className={`w-full h-full rounded-xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'grayscale brightness-75' : ''} bg-slate-800 transition-colors`}
+                                                >
+                                                    <Image
+                                                        src={card.image || config.image}
+                                                        alt={config.name || 'Card'}
+                                                        fill
+                                                        className="object-cover pointer-events-none"
+                                                    />
+                                                    {/* Highlight */}
+                                                    <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-colors pointer-events-none"></div>
+                                                </div>
+                                            </Reorder.Item>
+                                        );
+                                    })}
+                                    </AnimatePresence>
+                                </Reorder.Group>
+                            )
                         ) : (
                              <div className="text-white/30 text-sm font-bold pb-8">No cards in hand</div>
                         )}
