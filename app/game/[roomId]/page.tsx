@@ -558,6 +558,26 @@ export default function GamePage() {
       });
   };
 
+  const handleHandReorder = async (newHand: Card[]) => {
+      if (!gameState) return;
+      const { players } = gameState;
+
+      const newPlayers = [...players];
+      const playerIndex = newPlayers.findIndex((p) => p.id === userId);
+      if (playerIndex === -1) return;
+
+      newPlayers[playerIndex].hand = newHand;
+
+      // Update directly (no debounce for MVP, Firebase handles small writes well)
+      try {
+          await update(ref(db, `rooms/${roomId}/players/${playerIndex}`), {
+              hand: newHand
+          });
+      } catch (err) {
+          console.error("Reorder sync error:", err);
+      }
+  };
+
   // Modified UI Handler to intercept Targeted Cards
   const onUIPlayCard = (cards: any[], indices: number[]) => {
       const type = cards[0].type;
@@ -618,6 +638,7 @@ export default function GamePage() {
         stealTarget={stealTarget}
         onStealCard={handleStealSpecificCard}
         onInsertBomb={handleInsertBomb}
+        onHandReorder={handleHandReorder}
     />
     </>
   );

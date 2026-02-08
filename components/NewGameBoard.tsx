@@ -2,7 +2,7 @@
 
 import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 // @ts-ignore
 import { CARD_TYPES, CARD_BACK_IMAGE } from '@/utils/gameConfig';
 import type { GameState, Player, Card } from '@/types/game';
@@ -19,6 +19,7 @@ interface GameBoardProps {
   stealTarget?: {playerId: string, playerName: string, cardCount: number, type: string} | null;
   onStealCard?: (cardIndex: number) => void;
   onInsertBomb?: (index: number) => void;
+  onHandReorder?: (newHand: Card[]) => void;
 }
 
 // Bomb Insertion Overlay Component
@@ -189,7 +190,7 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discard
     );
 };
 
-const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope, stealTarget, onStealCard, onInsertBomb }: GameBoardProps, ref) => {
+const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope, stealTarget, onStealCard, onInsertBomb, onHandReorder }: GameBoardProps, ref) => {
   const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing, nopeTimer } = gameState;
 
   const currentPlayerIndex = players.findIndex((p: any) => p.id === currentPlayerId);
@@ -199,19 +200,39 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   // State for multi-selection
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [localTargetMode, setLocalTargetMode] = useState<boolean>(false);
+  const [localHand, setLocalHand] = useState<Card[]>([]);
+
+  // Sync local hand with game state, but only if length changed or not dragging (simplified)
+  useEffect(() => {
+      if (currentPlayer?.hand) {
+          // If lengths differ, hard sync. If content differs, sync.
+          // Ideally we trust local during drag, but hard sync on turn updates.
+          // For now, always sync when prop changes (might interrupt drag if realtime update happens).
+          setLocalHand(currentPlayer.hand);
+      }
+  }, [currentPlayer?.hand]);
+
+  const handleReorder = (newOrder: Card[]) => {
+      setLocalHand(newOrder);
+      if (onHandReorder) onHandReorder(newOrder);
+  };
 
   // Helper to toggle selection
-  const toggleSelectCard = (index: number) => {
+  const toggleSelectCard = (cardId: string, index: number) => {
+      // We use Card ID or Index. If reordered, Index changes.
+      // Ideally track by ID. But play logic uses indices for removal.
+      // We must map current local indices back to the "real" hand?
+      // Actually, if we reorder in backend, indices match.
+
       if (selectedIndices.includes(index)) {
           setSelectedIndices(selectedIndices.filter(i => i !== index));
       } else {
-          // Validation: Can only select same type for pairs/triples?
-          // Or limit to max 3? Let's keep it flexible but maybe visual cue.
-          const card = currentPlayer.hand[index];
-          const firstSelected = selectedIndices.length > 0 ? currentPlayer.hand[selectedIndices[0]] : null;
+          // Validation
+          const card = localHand[index];
+          const firstSelectedIdx = selectedIndices.length > 0 ? selectedIndices[0] : -1;
+          const firstSelected = firstSelectedIdx !== -1 ? localHand[firstSelectedIdx] : null;
 
           if (firstSelected && firstSelected.type !== card.type) {
-              // If type different, reset selection to new card (simplified UX)
               setSelectedIndices([index]);
           } else {
               setSelectedIndices([...selectedIndices, index]);
@@ -220,8 +241,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   };
 
   const handlePlaySelected = () => {
-      // Validate cards (Simple: Must be same type or special 5-diff)
-      const cards = selectedIndices.map(i => currentPlayer.hand[i]);
+      const cards = selectedIndices.map(i => localHand[i]);
       const type = cards[0].type;
       const allSame = cards.every(c => c.type === type);
 
@@ -708,55 +728,68 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 <div className="w-full h-56 relative mt-6 bg-[#d2b48c]/10 backdrop-blur-md border-t border-[#d2b48c]/20 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col justify-end pb-4">
                     <div className="absolute bottom-0 w-full h-8 bg-gradient-to-t from-[#0f172a] to-transparent z-0"></div>
 
-                    <div className="flex items-end justify-center px-10 gap-2 overflow-x-auto overflow-y-visible hand-scroll min-h-[220px] pb-4 pt-10 scroll-smooth">
+                    <div className="flex items-end justify-center px-10 overflow-x-auto overflow-y-visible hand-scroll min-h-[220px] pb-4 pt-10 scroll-smooth w-full">
 
-                        <AnimatePresence>
-                        {currentPlayer?.hand && currentPlayer.hand.map((card: any, index: number) => {
-                             const config = (CARD_TYPES as any)[card.type] || {};
+                        {localHand.length > 0 ? (
+                            <Reorder.Group
+                                axis="x"
+                                values={localHand}
+                                onReorder={handleReorder}
+                                className="flex items-end justify-center min-w-max px-20"
+                            >
+                                <AnimatePresence mode='popLayout'>
+                                {localHand.map((card: any, index: number) => {
+                                     const config = (CARD_TYPES as any)[card.type] || {};
+                                     const isSelected = selectedIndices.includes(index);
+                                     const isPlayable = isMyTurn && !pendingAction;
 
-                             const isSelected = selectedIndices.includes(index);
-                             const isPlayable = isMyTurn && !pendingAction;
+                                     // Dynamic Squashing: More cards = more negative margin
+                                     const overlap = localHand.length > 8 ? -80 : -60;
 
-                             return (
-                                <motion.div
-                                    layout
-                                    initial={{ opacity: 0, y: 200, scale: 0.5 }}
-                                    animate={{
-                                        opacity: 1,
-                                        y: isSelected ? -80 : 0,
-                                        scale: 1,
-                                        zIndex: isSelected ? 50 : 0,
-                                        rotate: 0
-                                    }}
-                                    exit={{
-                                        opacity: 0,
-                                        y: -400, // Fly up towards discard pile
-                                        scale: 0.2,
-                                        rotate: Math.random() * 360,
-                                        transition: { duration: 0.5 }
-                                    }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                                    key={card.id || index}
-                                    whileHover={{ y: isSelected ? -90 : -60, scale: 1.1, zIndex: 100, rotate: Math.random() * 4 - 2 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => isPlayable && toggleSelectCard(index)}
-                                    className={`relative flex-none w-36 h-52 rounded-xl shadow-2xl cursor-pointer group overflow-hidden ${!isPlayable ? 'opacity-50 grayscale' : ''} ${isSelected ? 'ring-4 ring-yellow-400' : ''}`}
-                                    style={{ marginLeft: index === 0 ? 0 : -60 }} // Overlap cards
-                                >
-                                    <Image
-                                        src={card.image || config.image}
-                                        alt={config.name || 'Card'}
-                                        fill
-                                        className="object-cover"
-                                    />
-                                    {/* Subtle highlight on hover */}
-                                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors pointer-events-none"></div>
-                                </motion.div>
-                             );
-                        })}
-                        </AnimatePresence>
-
-                        {!currentPlayer?.hand?.length && (
+                                     return (
+                                        <Reorder.Item
+                                            key={card.id}
+                                            value={card}
+                                            initial={{ opacity: 0, y: 200, scale: 0.5 }}
+                                            animate={{
+                                                opacity: 1,
+                                                y: isSelected ? -80 : 0,
+                                                scale: 1,
+                                                zIndex: isSelected ? 100 : index, // Ensure stacking order
+                                                rotate: 0
+                                            }}
+                                            exit={{
+                                                opacity: 0,
+                                                y: -400,
+                                                scale: 0.2,
+                                                rotate: Math.random() * 360,
+                                                transition: { duration: 0.5 }
+                                            }}
+                                            whileDrag={{ scale: 1.1, zIndex: 200, cursor: 'grabbing' }}
+                                            className="relative flex-none w-36 h-52 touch-none"
+                                            style={{ marginLeft: index === 0 ? 0 : overlap }}
+                                        >
+                                            <motion.div
+                                                whileHover={{ y: isSelected ? -90 : -60, scale: 1.1, zIndex: 200, rotate: Math.random() * 4 - 2 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => isPlayable && toggleSelectCard(card.id, index)}
+                                                className={`w-full h-full rounded-xl shadow-2xl cursor-grab active:cursor-grabbing overflow-hidden border-2 ${isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-white/10'} ${!isPlayable ? 'opacity-50 grayscale' : ''} bg-slate-800`}
+                                            >
+                                                <Image
+                                                    src={card.image || config.image}
+                                                    alt={config.name || 'Card'}
+                                                    fill
+                                                    className="object-cover pointer-events-none"
+                                                />
+                                                {/* Highlight */}
+                                                <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-colors pointer-events-none"></div>
+                                            </motion.div>
+                                        </Reorder.Item>
+                                     );
+                                })}
+                                </AnimatePresence>
+                            </Reorder.Group>
+                        ) : (
                              <div className="text-white/30 text-sm font-bold pb-8">No cards in hand</div>
                         )}
 
