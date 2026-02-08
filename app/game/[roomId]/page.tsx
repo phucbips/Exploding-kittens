@@ -571,7 +571,7 @@ export default function GamePage() {
 
       // End turn logic
       let nextTurnIndex = turnIndex;
-      let nextTurnsLeft = turnsLeft - 1;
+      let nextTurnsLeft = turnsLeft; // Don't decrement again, drawing already decremented
 
       if (nextTurnsLeft <= 0) {
           nextTurnIndex = getNextAlivePlayerIndex(turnIndex, players);

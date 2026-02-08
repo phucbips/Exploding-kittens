@@ -22,61 +22,68 @@ interface GameBoardProps {
   onHandReorder?: (newHand: Card[]) => void;
 }
 
-// Bomb Insertion Overlay Component
-const BombInsertionOverlay = ({ deckCount, onInsert }: { deckCount: number, onInsert: (idx: number) => void }) => {
+// Inline Bomb Controls Component
+const InlineBombControls = ({ deckCount, onInsert }: { deckCount: number, onInsert: (idx: number) => void }) => {
     const [insertIndex, setInsertIndex] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleUp = () => setInsertIndex(prev => Math.max(0, prev - 1));
     const handleDown = () => setInsertIndex(prev => Math.min(deckCount, prev + 1));
 
+    const handleConfirm = async () => {
+        setIsSubmitting(true);
+        // Small delay for animation before callback
+        setTimeout(() => {
+            onInsert(insertIndex);
+        }, 500);
+    };
+
+    // Calculate position relative to stack height (approx 208px/52 tailwind units)
+    const yPercent = (insertIndex / (deckCount || 1)) * 100;
+
     return (
-        <div className="absolute inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center animate-fadeIn pointer-events-auto">
-            <h2 className="text-3xl text-red-500 font-black mb-8 animate-pulse">HIDE THE BOMB!</h2>
+        <div className="absolute left-[120%] top-0 h-full flex items-start gap-4 z-[200] pointer-events-auto">
+             {/* Visual Bomb Card Sticking Out */}
+             <div className="absolute -left-[140%] top-0 w-36 h-52 pointer-events-none">
+                 <motion.div
+                    initial={{ x: 50, opacity: 0 }}
+                    animate={isSubmitting ? { x: 0, rotateY: 180, scale: 0.9, opacity: 0 } : { x: 80, opacity: 1, rotateY: 0, scale: 1 }}
+                    transition={{ duration: 0.4 }}
+                    className="absolute right-0 w-24 h-36 rounded-lg bg-red-600 border-2 border-yellow-400 shadow-xl flex items-center justify-center origin-left z-50"
+                    style={{ top: `${yPercent}%`, translateY: '-20%' }}
+                 >
+                     <div className="text-center transform rotate-90">
+                        <span className="block text-2xl font-black text-white drop-shadow-md">BOMB</span>
+                        <span className="text-xs text-yellow-200">Position {insertIndex}</span>
+                     </div>
+                 </motion.div>
+             </div>
 
-            <div className="relative flex items-center gap-12">
-                <div className="flex flex-col gap-4">
-                    <button onClick={handleUp} className="p-4 bg-gray-700 rounded-full hover:bg-gray-600 active:scale-95">
-                        <span className="material-symbols-outlined text-4xl">arrow_upward</span>
-                    </button>
-                    <button onClick={handleDown} className="p-4 bg-gray-700 rounded-full hover:bg-gray-600 active:scale-95">
-                        <span className="material-symbols-outlined text-4xl">arrow_downward</span>
-                    </button>
-                </div>
-
-                {/* Visual Stack Representation */}
-                <div className="relative w-40 h-64 perspective-1000">
-                    {/* Deck Block */}
-                    <div className="absolute top-10 left-0 w-full h-full bg-blue-900/50 rounded-xl border-4 border-blue-500 flex items-center justify-center">
-                        <span className="font-bold text-blue-300">DECK ({deckCount})</span>
-                    </div>
-
-                    {/* Bomb Card Floating */}
-                    <motion.div
-                        animate={{
-                            y: (insertIndex / (deckCount + 1)) * 200 - 50, // Map index to visual Y position
-                            scale: 1.1
-                        }}
-                        className="absolute left-0 w-full h-10 bg-red-600 rounded-md border-2 border-yellow-400 shadow-[0_0_15px_rgba(255,0,0,0.8)] z-20 flex items-center justify-center"
-                    >
-                        <span className="text-xs font-bold text-white">BOMB</span>
-                    </motion.div>
-                </div>
-
-                <div className="w-24">
-                    <p className="text-center text-gray-400 text-sm mb-2">Position</p>
-                    <div className="text-4xl font-mono font-bold text-center text-yellow-400 border-2 border-gray-700 rounded p-2">
-                        {insertIndex}
-                    </div>
-                    <p className="text-center text-gray-500 text-xs mt-1">From Top</p>
-                </div>
-            </div>
-
-            <button
-                onClick={() => onInsert(insertIndex)}
-                className="mt-12 px-12 py-4 bg-red-600 text-white font-bold rounded-xl text-2xl hover:bg-red-500 shadow-lg active:scale-95 border-b-4 border-red-800"
+            {/* Control Panel */}
+            <motion.div
+                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                className="flex flex-col gap-2 bg-slate-900/90 p-3 rounded-xl backdrop-blur-md border border-white/20 shadow-2xl mt-8"
             >
-                PLACE BOMB
-            </button>
+                <button onClick={handleUp} className="p-2 hover:bg-white/10 rounded-lg text-plasma-cyan active:scale-95 transition-all">
+                    <span className="material-symbols-outlined text-3xl">keyboard_arrow_up</span>
+                </button>
+
+                <div className="w-16 h-16 bg-black/50 rounded-lg border border-white/10 flex items-center justify-center">
+                    <span className="font-mono font-bold text-2xl text-yellow-400">{insertIndex}</span>
+                </div>
+
+                <button onClick={handleDown} className="p-2 hover:bg-white/10 rounded-lg text-plasma-cyan active:scale-95 transition-all">
+                    <span className="material-symbols-outlined text-3xl">keyboard_arrow_down</span>
+                </button>
+
+                <button
+                    onClick={handleConfirm}
+                    disabled={isSubmitting}
+                    className="mt-2 w-full py-2 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-lg shadow-lg active:scale-95 uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+                >
+                    {isSubmitting ? '...' : <>OK <span className="material-symbols-outlined text-sm">check</span></>}
+                </button>
+            </motion.div>
         </div>
     );
 };
@@ -277,9 +284,18 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
   const [activeOverlay, setActiveOverlay] = useState<string | null>(null);
   const [overlayData, setOverlayData] = useState<any>(null);
   const [isDealingAnimation, setIsDealingAnimation] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
   const [dealingPhase, setDealingPhase] = useState<'none' | 'defuse' | 'hand' | 'bomb'>('none');
   const [drawAnimation, setDrawAnimation] = useState<{from: string, to: string} | null>(null);
   const [prevDeckLen, setPrevDeckLen] = useState(deck ? deck.length : 0);
+
+  // Trigger Shake on Explosion or Shuffle
+  useEffect(() => {
+    if (pendingAction?.type === 'defuse_required') {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 500);
+    }
+  }, [pendingAction?.type]);
 
   // Trigger Dealing Animation Sequence
   useEffect(() => {
@@ -331,8 +347,12 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
           setTimeout(() => setActiveOverlay(null), 2500);
       },
       triggerShuffle: () => {
+          setIsShaking(true);
           setActiveOverlay('shuffle');
-          setTimeout(() => setActiveOverlay(null), 1500);
+          setTimeout(() => {
+              setActiveOverlay(null);
+              setIsShaking(false);
+          }, 1500);
       },
       triggerFavor: (targetName: string) => {
           setOverlayData(targetName);
@@ -395,7 +415,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
     <div className="font-display bg-tropical-night text-white h-screen w-full overflow-hidden selection:bg-plasma-cyan selection:text-black">
         <div className="absolute inset-0 bg-sand-pattern pointer-events-none z-0 mix-blend-overlay"></div>
 
-        <div className="relative z-10 flex flex-col h-full w-full max-w-[1920px] mx-auto">
+        <motion.div
+            animate={isShaking ? { x: [-5, 5, -5, 5, 0] } : {}}
+            transition={{ duration: 0.4 }}
+            className="relative z-10 flex flex-col h-full w-full max-w-[1920px] mx-auto"
+        >
 
             {/* TOP: Header & Opponents */}
             <header className="flex-none px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur-sm flex items-center justify-between">
@@ -510,11 +534,6 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                          </div>
                          <p className="text-white/50 mt-4">Click a card back to steal it.</p>
                      </div>
-                 )}
-
-                 {/* Bomb Insertion Overlay */}
-                 {pendingAction?.type === 'insert_bomb' && pendingAction.targetPlayerId === currentPlayerId && onInsertBomb && (
-                     <BombInsertionOverlay deckCount={deck ? deck.length : 0} onInsert={onInsertBomb} />
                  )}
 
                 {/* ANIMATION OVERLAYS */}
@@ -651,13 +670,16 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                 {!isDealingAnimation && (
                     <div className="flex items-center justify-center gap-24 w-full max-w-4xl relative z-10 animate-fadeIn">
                         {/* Draw Pile Area */}
-                        <div className={`flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
+                        <div className={`relative flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
                             <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
                             <CardStack
                                 count={deck ? deck.length : 0}
                                 type="draw"
                                 onClick={handleDrawClick}
                             />
+                            {pendingAction?.type === 'insert_bomb' && pendingAction.targetPlayerId === currentPlayerId && onInsertBomb && (
+                                <InlineBombControls deckCount={deck ? deck.length : 0} onInsert={onInsertBomb} />
+                            )}
                         </div>
 
                         {/* Discard Pile Area */}
@@ -689,7 +711,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
             </main>
 
             {/* BOTTOM: Player Hand & Controls */}
-            <footer className="flex-none relative w-full flex flex-col items-center z-50">
+            <footer className="flex-none relative w-full flex flex-col items-center z-[100]">
                 <div className="absolute -top-20 z-30 flex items-center gap-6 pointer-events-auto">
                     {/* NOPE BUTTON (Left) */}
                     <button
@@ -765,7 +787,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 opacity: 1,
                                                 y: isSelected ? -50 : yOffset, // Tucked down by default, pop up if selected
                                                 scale: 1,
-                                                zIndex: isSelected ? 100 : index,
+                                                zIndex: isSelected ? 300 : (200 + index),
                                                 rotate: isSelected ? 0 : rotateVal
                                             }}
                                             exit={{
@@ -780,7 +802,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                                 y: -20, // Pop up to reveal full card
                                                 rotate: 0, // Straighten
                                                 scale: 1.1,
-                                                zIndex: 200,
+                                                zIndex: 300,
                                                 transition: { duration: 0.2 }
                                             }}
                                             className="relative flex-none w-36 h-52 touch-none"
@@ -811,7 +833,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     </motion.div>
                 </div>
             </footer>
-        </div>
+        </motion.div>
     </div>
   );
 });
