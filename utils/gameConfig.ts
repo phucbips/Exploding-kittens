@@ -136,7 +136,6 @@ export const CARD_TYPES = {
     name: 'Mèo Cầu Vồng',
     image: 'https://explodi.ng/images/cards/cat-card/artworks/Rainbow-Ralphing-Cat.jpg'
   },
-  // New Cat types or variants as requested
   BIKINI_CAT: {
     count: 4,
     name: 'Mèo Bikini',

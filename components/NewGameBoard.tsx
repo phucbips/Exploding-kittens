@@ -18,10 +18,71 @@ interface GameBoardProps {
   onNope: () => void; // New Nope handler
   stealTarget?: {playerId: string, playerName: string, cardCount: number, type: string} | null;
   onStealCard?: (cardIndex: number) => void;
+  onInsertBomb?: (index: number) => void;
 }
 
+// Bomb Insertion Overlay Component
+const BombInsertionOverlay = ({ deckCount, onInsert }: { deckCount: number, onInsert: (idx: number) => void }) => {
+    const [insertIndex, setInsertIndex] = useState(0);
+
+    const handleUp = () => setInsertIndex(prev => Math.max(0, prev - 1));
+    const handleDown = () => setInsertIndex(prev => Math.min(deckCount, prev + 1));
+
+    return (
+        <div className="absolute inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center animate-fadeIn pointer-events-auto">
+            <h2 className="text-3xl text-red-500 font-black mb-8 animate-pulse">HIDE THE BOMB!</h2>
+
+            <div className="relative flex items-center gap-12">
+                <div className="flex flex-col gap-4">
+                    <button onClick={handleUp} className="p-4 bg-gray-700 rounded-full hover:bg-gray-600 active:scale-95">
+                        <span className="material-symbols-outlined text-4xl">arrow_upward</span>
+                    </button>
+                    <button onClick={handleDown} className="p-4 bg-gray-700 rounded-full hover:bg-gray-600 active:scale-95">
+                        <span className="material-symbols-outlined text-4xl">arrow_downward</span>
+                    </button>
+                </div>
+
+                {/* Visual Stack Representation */}
+                <div className="relative w-40 h-64 perspective-1000">
+                    {/* Deck Block */}
+                    <div className="absolute top-10 left-0 w-full h-full bg-blue-900/50 rounded-xl border-4 border-blue-500 flex items-center justify-center">
+                        <span className="font-bold text-blue-300">DECK ({deckCount})</span>
+                    </div>
+
+                    {/* Bomb Card Floating */}
+                    <motion.div
+                        animate={{
+                            y: (insertIndex / (deckCount + 1)) * 200 - 50, // Map index to visual Y position
+                            scale: 1.1
+                        }}
+                        className="absolute left-0 w-full h-10 bg-red-600 rounded-md border-2 border-yellow-400 shadow-[0_0_15px_rgba(255,0,0,0.8)] z-20 flex items-center justify-center"
+                    >
+                        <span className="text-xs font-bold text-white">BOMB</span>
+                    </motion.div>
+                </div>
+
+                <div className="w-24">
+                    <p className="text-center text-gray-400 text-sm mb-2">Position</p>
+                    <div className="text-4xl font-mono font-bold text-center text-yellow-400 border-2 border-gray-700 rounded p-2">
+                        {insertIndex}
+                    </div>
+                    <p className="text-center text-gray-500 text-xs mt-1">From Top</p>
+                </div>
+            </div>
+
+            <button
+                onClick={() => onInsert(insertIndex)}
+                className="mt-12 px-12 py-4 bg-red-600 text-white font-bold rounded-xl text-2xl hover:bg-red-500 shadow-lg active:scale-95 border-b-4 border-red-800"
+            >
+                PLACE BOMB
+            </button>
+        </div>
+    );
+};
+
 // 3D Card Stack Component - Optimized with "Squash" and "Impact"
-const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void }) => {
+// Modified to support "Messy Discard Pile" visualization
+const CardStack = ({ count, type = 'draw', topCardImage = null, onClick, discardCards = [] }: { count: number, type?: 'draw' | 'discard', topCardImage?: string | null, onClick?: () => void, discardCards?: any[] }) => {
     const thickness = Math.min(count, 20); // Clamp visual thickness
 
     const generateStackShadow = (size: number) => {
@@ -38,9 +99,41 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { cou
         </div>
     );
 
-    // Impact Animation trigger (when count increases for discard)
-    // We use a key to re-trigger animation on change if needed, or rely on whileTap for interaction.
-    // For "Impact" on discard (new card landing), we can use `animate`.
+    // Discard Pile: Render last 5 cards messily if provided
+    if (type === 'discard' && discardCards && discardCards.length > 0) {
+        const visibleCards = discardCards.slice(-5); // Only show last 5 for performance/clutter
+
+        return (
+            <div className="relative w-36 h-52 group cursor-pointer" onClick={onClick}>
+                 {visibleCards.map((card, idx) => {
+                     // Seeded random rotation based on card ID or index
+                     const seed = card.id ? card.id.charCodeAt(card.id.length - 1) : idx;
+                     const rotate = (seed % 20) - 10; // -10 to 10 deg
+                     const xOffset = (seed % 10) - 5;
+                     const yOffset = (seed % 10) - 5;
+
+                     const isTop = idx === visibleCards.length - 1;
+
+                     return (
+                         <motion.div
+                            key={card.id || idx}
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1, rotate: rotate, x: xOffset, y: yOffset }}
+                            className="absolute inset-0 w-36 h-52 rounded-xl border-2 border-white/20 bg-white shadow-md overflow-hidden"
+                            style={{ zIndex: idx }}
+                         >
+                            <Image src={card.image} alt="Discard" fill className="object-cover" />
+                         </motion.div>
+                     );
+                 })}
+
+                 {/* Badge */}
+                <div className="absolute -top-4 -right-4 bg-yellow-400 text-black font-black w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-black text-sm z-50">
+                  {count}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="relative perspective-1000 group cursor-pointer" onClick={onClick}>
@@ -96,7 +189,7 @@ const CardStack = ({ count, type = 'draw', topCardImage = null, onClick }: { cou
     );
 };
 
-const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope, stealTarget, onStealCard }: GameBoardProps, ref) => {
+const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPlayCard, onStartGame, onGiveCard, onSelectTarget, onNope, stealTarget, onStealCard, onInsertBomb }: GameBoardProps, ref) => {
   const { players, deck, discardPile, turnIndex, gameState: status, pendingAction, isDealing, nopeTimer } = gameState;
 
   const currentPlayerIndex = players.findIndex((p: any) => p.id === currentPlayerId);
@@ -399,6 +492,11 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                      </div>
                  )}
 
+                 {/* Bomb Insertion Overlay */}
+                 {pendingAction?.type === 'insert_bomb' && pendingAction.targetPlayerId === currentPlayerId && onInsertBomb && (
+                     <BombInsertionOverlay deckCount={deck ? deck.length : 0} onInsert={onInsertBomb} />
+                 )}
+
                 {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
                     {/* Dealing Animation - Phase 1: Defuse (Fly up from bottom, fan out, deal) */}
@@ -551,6 +649,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                     <CardStack
                                         count={discardPile ? discardPile.length : 0}
                                         type="discard"
+                                    discardCards={discardPile}
                                         topCardImage={discardPile && discardPile.length > 0 ? discardPile[discardPile.length - 1].image : null}
                                     />
                                 </div>
