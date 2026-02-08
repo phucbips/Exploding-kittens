@@ -175,19 +175,20 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
           setDealingPhase('defuse');
 
           // Timeline:
-          // 0s: Start Defuse Deal
-          // 2s: Start Hand Deal (4 cards each)
-          // 4s: Start Bomb Insert
-          // 6s: End
+          // 0s: Defuse cards fly up and deal to players (1s)
+          // 1s: Hand cards deal round-robin (4 * players * 0.2s approx)
+          // Let's calculate duration dynamically based on player count
+          const defuseDuration = 1500;
+          const handDuration = players.length * 4 * 200 + 1000; // 200ms per card + buffer
 
-          setTimeout(() => setDealingPhase('hand'), 2000);
-          setTimeout(() => setDealingPhase('bomb'), 4000);
+          setTimeout(() => setDealingPhase('hand'), defuseDuration);
+          setTimeout(() => setDealingPhase('bomb'), defuseDuration + handDuration);
           setTimeout(() => {
               setDealingPhase('none');
               setIsDealingAnimation(false);
-          }, 6000);
+          }, defuseDuration + handDuration + 2000); // +2s for bomb insert
       }
-  }, [isDealing]);
+  }, [isDealing, players.length]);
 
   // Trigger Draw Animation
   useEffect(() => {
@@ -400,20 +401,28 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
 
                 {/* ANIMATION OVERLAYS */}
                 <AnimatePresence>
-                    {/* Dealing Animation - Phase 1: Defuse */}
+                    {/* Dealing Animation - Phase 1: Defuse (Fly up from bottom, fan out, deal) */}
                     {isDealingAnimation && dealingPhase === 'defuse' && (
                          <div className="absolute inset-0 z-[100] pointer-events-none">
                              {players.map((p: any, idx: number) => {
                                  const isMe = p.id === currentPlayerId;
+                                 // Target positions
                                  const targetX = isMe ? '50%' : `${(idx + 1) * (100 / (players.length + 1))}%`;
                                  const targetY = isMe ? '90%' : '10%';
+
+                                 // Fan out calculation (center bottom)
+                                 const fanAngle = (idx - (players.length - 1) / 2) * 10;
+                                 const fanX = 50 + (idx - (players.length - 1) / 2) * 5;
+
                                  return (
                                      <motion.div
                                          key={`defuse-${p.id}`}
-                                         initial={{ top: '50%', left: '50%', scale: 0, opacity: 0 }}
-                                         animate={{ top: targetY, left: targetX, scale: 1, opacity: 1, x: '-50%', y: '-50%' }}
-                                         transition={{ duration: 1.5, ease: "easeInOut" }}
-                                         className="absolute w-24 h-36 rounded-lg border-2 border-green-500 shadow-[0_0_20px_rgba(0,255,0,0.5)] overflow-hidden bg-slate-800"
+                                         initial={{ bottom: '-20%', left: '50%', x: '-50%', rotate: 0, scale: 0.8, opacity: 0 }}
+                                         animate={[
+                                             { bottom: '20%', left: `${fanX}%`, rotate: fanAngle, scale: 1, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }, // Fan out
+                                             { top: targetY, left: targetX, bottom: 'auto', rotate: 0, scale: 0.6, opacity: 0, transition: { duration: 0.5, delay: 0.8 + idx * 0.1, ease: "easeInOut" } } // Deal to player
+                                         ]}
+                                         className="absolute w-24 h-36 rounded-lg border-2 border-green-500 shadow-[0_0_20px_rgba(0,255,0,0.5)] overflow-hidden bg-slate-800 origin-bottom"
                                      >
                                          <Image src={(CARD_TYPES as any).DEFUSE.image} alt="Defuse" fill className="object-cover" />
                                      </motion.div>
@@ -422,27 +431,32 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                          </div>
                     )}
 
-                    {/* Dealing Animation - Phase 2: Hand (4 Cards) */}
+                    {/* Dealing Animation - Phase 2: Hand (Round Robin Deal) */}
                     {isDealingAnimation && dealingPhase === 'hand' && (
                         <div className="absolute inset-0 z-[100] pointer-events-none">
-                             {players.map((p: any, pIdx: number) => (
-                                 [0,1,2,3].map((cIdx) => {
+                             {/* Generate flat list of deals: [P1-C1, P2-C1, P3-C1, P1-C2, ...] */}
+                             {Array.from({ length: 4 }).flatMap((_, roundIdx) =>
+                                players.map((p: any, pIdx: number) => {
                                      const isMe = p.id === currentPlayerId;
                                      const targetX = isMe ? '50%' : `${(pIdx + 1) * (100 / (players.length + 1))}%`;
                                      const targetY = isMe ? '90%' : '10%';
+
+                                     // Calculate strict delay: (Round * Players + PlayerIndex) * speed
+                                     const delay = (roundIdx * players.length + pIdx) * 0.15;
+
                                      return (
                                          <motion.div
-                                             key={`hand-${p.id}-${cIdx}`}
-                                             initial={{ top: '-10%', left: '50%', scale: 1, opacity: 1 }}
-                                             animate={{ top: targetY, left: targetX, scale: 0.5, opacity: 0, x: '-50%', y: '-50%' }}
-                                             transition={{ duration: 0.8, delay: cIdx * 0.2, ease: "easeIn" }}
+                                             key={`hand-${p.id}-${roundIdx}`}
+                                             initial={{ top: '-10%', left: '50%', scale: 1, opacity: 1, x: '-50%' }}
+                                             animate={{ top: targetY, left: targetX, scale: 0.5, opacity: 0, rotate: 360 }}
+                                             transition={{ duration: 0.4, delay: delay, ease: "linear" }}
                                              className="absolute w-24 h-36 rounded-lg border-2 border-white/50 shadow-xl overflow-hidden bg-slate-800"
                                          >
                                              <Image src={CARD_BACK_IMAGE} alt="Back" fill className="object-cover" />
                                          </motion.div>
                                      );
-                                 })
-                             ))}
+                                })
+                             )}
                         </div>
                     )}
 
@@ -504,33 +518,36 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                     {/* ... other animations ... */}
                 </AnimatePresence>
 
-                <div className="flex items-center justify-center gap-24 w-full max-w-4xl relative z-10">
-                    {/* Draw Pile Area */}
-                    <div className={`flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
-                        <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
-                        <CardStack
-                            count={deck ? deck.length : 0}
-                            type="draw"
-                            onClick={handleDrawClick}
-                        />
-                    </div>
+                {/* Hide piles during dealing animation */}
+                {!isDealingAnimation && (
+                    <div className="flex items-center justify-center gap-24 w-full max-w-4xl relative z-10 animate-fadeIn">
+                        {/* Draw Pile Area */}
+                        <div className={`flex flex-col items-center gap-4 transition-transform duration-300 ${(isMyTurn && !pendingAction) ? 'cursor-pointer hover:-translate-y-2' : ''}`}>
+                            <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-plasma-cyan transition-colors">Draw Pile</span>
+                            <CardStack
+                                count={deck ? deck.length : 0}
+                                type="draw"
+                                onClick={handleDrawClick}
+                            />
+                        </div>
 
-                    {/* Discard Pile Area */}
-                    <div className="flex flex-col items-center gap-4">
-                        <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-magma-red transition-colors">Discard Pile</span>
-                        <div className="relative w-52 h-52 flex items-center justify-center">
-                            <div className="absolute inset-0 rounded-full border-4 border-dashed border-magma-red/60 animate-[spin_20s_linear_infinite]"></div>
+                        {/* Discard Pile Area */}
+                        <div className="flex flex-col items-center gap-4">
+                            <span className="text-xs font-bold tracking-widest text-white/40 uppercase group-hover:text-magma-red transition-colors">Discard Pile</span>
+                            <div className="relative w-52 h-52 flex items-center justify-center">
+                                <div className="absolute inset-0 rounded-full border-4 border-dashed border-magma-red/60 animate-[spin_20s_linear_infinite]"></div>
 
-                            <div className="flex items-center justify-center">
-                                <CardStack
-                                    count={discardPile ? discardPile.length : 0}
-                                    type="discard"
-                                    topCardImage={discardPile && discardPile.length > 0 ? discardPile[discardPile.length - 1].image : null}
-                                />
+                                <div className="flex items-center justify-center">
+                                    <CardStack
+                                        count={discardPile ? discardPile.length : 0}
+                                        type="discard"
+                                        topCardImage={discardPile && discardPile.length > 0 ? discardPile[discardPile.length - 1].image : null}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <div className="absolute top-8 pointer-events-none">
                     <div className="bg-black/40 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full">
