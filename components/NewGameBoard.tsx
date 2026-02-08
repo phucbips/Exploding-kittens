@@ -418,10 +418,20 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                                      <motion.div
                                          key={`defuse-${p.id}`}
                                          initial={{ bottom: '-20%', left: '50%', x: '-50%', rotate: 0, scale: 0.8, opacity: 0 }}
-                                         animate={[
-                                             { bottom: '20%', left: `${fanX}%`, rotate: fanAngle, scale: 1, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }, // Fan out
-                                             { top: targetY, left: targetX, bottom: 'auto', rotate: 0, scale: 0.6, opacity: 0, transition: { duration: 0.5, delay: 0.8 + idx * 0.1, ease: "easeInOut" } } // Deal to player
-                                         ]}
+                                         animate={{
+                                             bottom: ['-20%', '20%', 'auto'],
+                                             top: ['auto', 'auto', targetY],
+                                             left: ['50%', `${fanX}%`, targetX],
+                                             rotate: [0, fanAngle, 0],
+                                             scale: [0.8, 1, 0.6],
+                                             opacity: [0, 1, 0]
+                                         }}
+                                         transition={{
+                                             duration: 1.5,
+                                             times: [0, 0.3, 1], // 0-30% fan out, 30%-100% deal
+                                             ease: "easeInOut",
+                                             delay: idx * 0.1 // Stagger start slightly
+                                         }}
                                          className="absolute w-24 h-36 rounded-lg border-2 border-green-500 shadow-[0_0_20px_rgba(0,255,0,0.5)] overflow-hidden bg-slate-800 origin-bottom"
                                      >
                                          <Image src={(CARD_TYPES as any).DEFUSE.image} alt="Defuse" fill className="object-cover" />
