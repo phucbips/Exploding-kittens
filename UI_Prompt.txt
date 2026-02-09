@@ -1,0 +1,44 @@
+**I. Tổng Quan Phong Cách (Style Guide)**
+
+1.  **Chủ Đạo:** Minimalist, Clean, Modern LMS (Learning Management System) Vibe.
+2.  **Màu Sắc:**
+    *   **Nền (Background):** Trắng nhạt (Off-white), Xám nhạt (Light Grey), hoặc Gradient nhẹ (Pastel Blue/Green).
+    *   **Accent (Điểm nhấn):** Màu xanh dương đậm (Royal Blue) hoặc Cam san hô (Coral) cho các nút hành động chính.
+    *   **Thẻ Bài:** Màu sắc rõ ràng, typography hiện đại, icon vector phẳng (Flat Design).
+3.  **Hình Khối:** Rounded Corners (Bo tròn mềm mại), Soft Shadows (Đổ bóng nhẹ tạo chiều sâu), Card UI (Giao diện dạng thẻ).
+4.  **Typography:** Sans-serif fonts (Inter, Roboto, Open Sans) - Clean, dễ đọc.
+
+**II. Các Thành Phần Giao Diện Cần Thiết Kế (UI Components)**
+
+1.  **Lobby Screen:**
+    *   **Danh Sách Phòng:** Card view sạch sẽ, mỗi phòng là một thẻ bo tròn với shadow nhẹ.
+    *   **Nút Tạo Phòng:** Floating Action Button (FAB) hoặc nút lớn bo tròn ở góc/giữa.
+    *   **Profile:** Avatar tròn đơn giản (Placeholder hoặc Vector Art), tên người chơi in đậm.
+
+2.  **In-Game Screen:**
+    *   **Bàn Chơi (Table):** Một mặt phẳng sạch (Clean surface), có thể có vân gỗ nhẹ hoặc màu solid.
+    *   **Player Avatar:** Vòng tròn avatar nhỏ gọn, tên ở dưới, thanh trạng thái (Turn timer) chạy quanh viền avatar.
+    *   **Hand (Bài trên tay):** Các lá bài xếp chồng nhẹ, hiệu ứng hover nhô lên mượt mà. Mặt sau bài thiết kế pattern hình học đơn giản.
+    *   **Deck & Discard Pile:** 3D Stack tối giản, shadow đổ xuống bàn.
+
+3.  **Overlays & Dialogs (Giao Diện Chức Năng):**
+    *   **Defuse UI (Gỡ Bom):** Modal (Hộp thoại) hiện giữa màn hình, nền mờ (Glassmorphism). Thanh trượt (Slider) hoặc nút +/- tinh tế để chọn vị trí bom.
+    *   **Winner/Loser Screen:** Minimalist Trophy icon hoặc text "Victory" font lớn, confetti rơi nhẹ nhàng (không quá loè loẹt).
+    *   **Action Confirmation:** Popup nhỏ gọn xác nhận hành động (VD: "Dùng Nope?").
+
+**III. Animation & Motion Design (Cần Cải Thiện)**
+
+1.  **Card Deal (Chia bài):**
+    *   *Yêu cầu:* Mượt mà, nhanh gọn (Snappy). Bài bay từ Deck về Hand với easing function tự nhiên.
+2.  **Hover Effect:**
+    *   *Yêu cầu:* Khi di chuột vào bài trên tay, lá bài hơi phóng to và đẩy các lá khác ra xa (Apple Dock style) để dễ chọn.
+3.  **Flip Animation (Lật bài):**
+    *   *Yêu cầu:* Hiệu ứng lật 3D mượt mà khi đánh bài ra hoặc khi gỡ bom.
+4.  **Shake/Error:**
+    *   *Yêu cầu:* Rung nhẹ (Subtle shake) khi người chơi cố đánh bài không hợp lệ hoặc khi nổ (Explosion). Không rung quá mạnh gây chóng mặt.
+5.  **Turn Indicator:**
+    *   *Yêu cầu:* Một luồng sáng nhẹ (Glow) hoặc viền chạy quanh avatar người đang đến lượt.
+
+**IV. Prompt Gợi Ý (Gửi cho AI/Designer)**
+
+> "Design a modern, clean, and minimalist UI for a digital card game. Style inspiration: Modern Dashboard/LMS interfaces. Use soft rounded corners, subtle drop shadows, and a pastel color palette with strong accent colors for primary actions. The interface should feel spacious and uncluttered. Key elements: Card stacks, Player avatars with status indicators, and Glassmorphism overlays for game events."
