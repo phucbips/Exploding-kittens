@@ -1,0 +1,4 @@
+## 2026-02-10 - Open Firebase Database Rules
+**Vulnerability:** The Firebase Realtime Database rules were configured to allow public read and write access to the entire database (`.read: true, .write: true`). This allowed any user to potentially read, modify, or delete all data, including critical game state and potentially sensitive information if it were stored.
+**Learning:** Default Firebase configurations or rapid prototyping can often lead to overly permissive security rules being deployed and forgotten. The application code only accessed data under `rooms/$roomId`, but the rules did not reflect this restriction.
+**Prevention:** Always implement the principle of least privilege. Configure database rules to match the specific data access patterns of the application. Regularly audit security rules and use environment variables for sensitive configurations.
