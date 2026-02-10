@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue, update, onDisconnect, remove } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
@@ -32,6 +32,13 @@ export default function GamePage() {
       if (data) {
         setGameState(data);
         setError(null);
+
+        // Host Presence for Game Page
+        if (data.players && data.players[0]?.id === storedUserId) {
+            onDisconnect(ref(db, `public_rooms/${roomId}`)).remove();
+            onDisconnect(ref(db, `rooms/${roomId}`)).remove();
+        }
+
       } else {
         setError('Room not found or empty.');
       }
@@ -47,28 +54,15 @@ export default function GamePage() {
     return () => unsubscribe();
   }, [roomId, router]);
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/?room=${roomId}`;
+    navigator.clipboard.writeText(link);
+    alert('Đã sao chép link mời!');
+  };
+
   const handleStartGame = async () => {
-    if (!gameState || !gameState.players) return;
-
-    const playerNames = gameState.players.map((p: any) => p.name);
-    const initialGameData = initializeGame(playerNames);
-
-    const patchedPlayers = initialGameData.players.map((p: any, index: number) => ({
-        ...p,
-        id: gameState.players[index].id,
-        name: gameState.players[index].name
-    }));
-
-    try {
-        await update(ref(db, `rooms/${roomId}`), {
-            ...initialGameData,
-            players: patchedPlayers,
-            gameState: 'playing'
-        });
-    } catch (err: any) {
-        console.error("Start game error:", err);
-        alert(`Failed to start game: ${err.message}`);
-    }
+    // Game start is now handled in Lobby
+    alert("Game already started!");
   };
 
   const getNextAlivePlayerIndex = (currentIndex: number, players: Player[]) => {
@@ -168,9 +162,9 @@ export default function GamePage() {
     }
   };
 
-  const handlePlayCard = async (card: any, cardIndex: number) => {
+  const handlePlayCard = async (cards: any[], indices: number[]) => {
      if (!gameState) return;
-    const { players, turnIndex, discardPile, deck, turnsLeft = 1, pendingAction } = gameState;
+    const { players, turnIndex, discardPile, deck, turnsLeft = 1, pendingAction, nopeTimer } = gameState;
     const currentPlayer = players[turnIndex];
 
     if (currentPlayer.id !== userId) {
@@ -178,18 +172,19 @@ export default function GamePage() {
         return;
     }
 
-    // Check if we are in a special state (like needing to give a Favor card) - but usually PlayCard is for the active player
-    // If pendingAction exists and targets ME, I might be giving a card, handled by onGiveCard, not PlayCard
-    if (pendingAction) {
+    if (pendingAction && pendingAction.type !== 'play_action') {
         alert("Resolving pending action...");
         return;
     }
 
-    // Special logic for pairs (simple MVP version: check if previous card in discard is same? No, pairs are played together)
-    // For now, let's stick to single card actions + Favor/Attack logic
+    // Multi-card Logic (Pair/Triple)
+    const card = cards[0];
+    const isPair = cards.length === 2 && cards[0].type === cards[1].type;
+    const isTriple = cards.length === 3 && cards[0].type === cards[1].type && cards[1].type === cards[2].type;
+    const isSpecial = cards.length === 5; // 5 diff cards = reclaim discard (advanced)
 
-    if (card.type === 'DEFUSE') {
-        alert("Chỉ được dùng Gỡ Bom khi rút phải Mèo Nổ!");
+    if (cards.length > 1 && !isPair && !isTriple && !isSpecial) {
+        alert("Chỉ được đánh bài lẻ, đôi hoặc bộ ba cùng loại!");
         return;
     }
 
@@ -197,24 +192,149 @@ export default function GamePage() {
     const playerIndex = newPlayers.findIndex((p) => p.id === userId);
     const player = newPlayers[playerIndex];
 
-    // Remove card from hand
-    player.hand.splice(cardIndex, 1);
-    const newDiscardPile = [...(discardPile || []), card];
+    // Remove cards from hand (indices must be sorted desc to avoid shift issues)
+    indices.sort((a, b) => b - a).forEach(idx => {
+        player.hand.splice(idx, 1);
+    });
 
-    let nextTurnIndex = turnIndex;
-    let nextTurnsLeft = turnsLeft;
-    let currentDeck = deck ? [...deck] : [];
-    let newPendingAction = null;
+    const newDiscardPile = [...(discardPile || []), ...cards];
 
-    switch (card.type) {
+    // IF PAIR/TRIPLE/FAVOR -> Needs Target.
+    if (isPair || isTriple || card.type === 'FAVOR') {
+        // Just update hand/discard and set UI to selection mode?
+        // No, we need to select target FIRST or wait for timer?
+        // User flow: Select Cards -> Click Play -> (If needed) Click Target -> (Then) Wait 3s.
+        // But UI logic is handled in component. Here we just process the "Intent".
+        // Actually, we should probably update DB to show "Player X played Favor" and start 3s timer.
+        // BUT if it needs a target, we need that info.
+        // Let's assume for Favor/Pair/Triple, the UI handled targeting BEFORE calling this if needed?
+        // Or we just set pendingAction = 'select_target' in DB?
+        // Simplest: User clicks "Play 2 Cards" -> UI prompts target -> calls `onSelectTarget` -> which calls `handleActionWithTarget`.
+        // If NO target needed (Attack, Shuffle, Skip, SeeFuture), we start the 3s Timer.
+
+        // Wait, for this iteration, let's stick to: "Play" button triggers immediately if no target needed.
+        // If target needed (Pair/Triple/Favor), we should have selected it?
+        // Let's rely on `onSelectTarget` for those.
+        // So `handlePlayCard` is only for NON-TARGET cards OR initializing the sequence?
+
+        // Refined Logic:
+        // 1. Cards removed from hand. Added to discard.
+        // 2. 3s Timer Starts.
+        // 3. pendingAction set to { type: 'play_action', cardType: ... }.
+        // 4. If Noped, revert.
+        // 5. If Timer ends, execute effect.
+
+        // BUT if target is required, we can't start timer until target selected?
+        // Let's say we start timer AFTER target selection for targeted actions.
+        // For untargeted (Attack, Skip, etc.), we start here.
+
+        if (card.type === 'FAVOR' || isPair || isTriple) {
+             // We need a target. Revert hand changes locally (conceptually) or just tell user to select target first?
+             // UI should block "Play" until target selected? No, standard is Play then Target.
+             // We will trigger "Target Mode" in UI from here? No, strictly data flow.
+             // Let's assume onPlayCard is ONLY called for untargeted cards.
+             // Targeted cards are handled via `onSelectTarget` flow initiated by `localTargetMode`.
+             // But the user asked for a "Play" button.
+
+             // OK, if it's a targeted card/combo, we just set a local "Targeting" state in UI?
+             // But we are in `page.tsx`.
+             // We will handle this in `onUIPlayCard` adapter.
+             return;
+        }
+    }
+
+    // UNTARGETED ACTIONS (Skip, Attack, Shuffle, SeeFuture, Nope, etc)
+    const pending = {
+        type: 'play_action',
+        cardType: card.type,
+        count: cards.length,
+        sourcePlayerId: userId,
+        startTime: Date.now()
+    };
+
+    try {
+        await update(ref(db, `rooms/${roomId}`), {
+            players: newPlayers,
+            discardPile: newDiscardPile,
+            pendingAction: pending,
+            nopeTimer: Date.now() + 4000 // 4s window (3s + buffer)
+        });
+        // We also need a cloud function or client-side poller to execute the action when timer expires.
+        // We'll use a useEffect in this component to watch the timer.
+    } catch (err: any) {
+        console.error("Play error:", err);
+    }
+  };
+
+  const handleNope = async () => {
+      if (!gameState || !gameState.pendingAction) return;
+
+      // Check if user has Nope
+      const playerIndex = gameState.players.findIndex(p => p.id === userId);
+      const player = gameState.players[playerIndex];
+      const nopeIndex = player.hand.findIndex(c => c.type === 'NOPE');
+
+      if (nopeIndex === -1) return;
+
+      const newPlayers = [...gameState.players];
+      const nopeCard = newPlayers[playerIndex].hand.splice(nopeIndex, 1)[0];
+      const newDiscardPile = [...(gameState.discardPile || []), nopeCard];
+
+      // Logic: If pendingAction is 'play_action', we cancel it.
+      // If it was already Noped (how to track?), we might re-enable it?
+      // "YUP" card? Standard rules: Nope cancels Nope.
+      // We need to track `nopeCount` in pendingAction?
+
+      // Simplified: If pendingAction exists, Nope cancels it and clears pendingAction.
+      // Unless it's an Explode? (Nope can't stop explode).
+      if (gameState.pendingAction.type === 'explode') return;
+
+      try {
+        await update(ref(db, `rooms/${roomId}`), {
+            players: newPlayers,
+            discardPile: newDiscardPile,
+            pendingAction: null, // Action Cancelled!
+            nopeTimer: null
+        });
+        alert("NOPE! Action cancelled.");
+      } catch (err) { console.error(err); }
+  };
+
+  // Effect to execute pending actions after timer
+  useEffect(() => {
+      if (!gameState || !gameState.nopeTimer || !gameState.pendingAction) return;
+      if (gameState.players[gameState.turnIndex].id !== userId) return; // Only host/turn owner executes?
+      // Actually better if the turn owner executes their own action to avoid race conditions.
+      // But if it's Noped, action is null.
+
+      const timeLeft = gameState.nopeTimer - Date.now();
+      if (timeLeft <= 0) {
+          // Timer expired! Execute Action.
+          executePendingAction();
+      } else {
+          const timer = setTimeout(() => {
+              executePendingAction();
+          }, timeLeft);
+          return () => clearTimeout(timer);
+      }
+  }, [gameState?.nopeTimer, gameState?.pendingAction]);
+
+  const executePendingAction = async () => {
+      if (!gameState || !gameState.pendingAction) return;
+      const { pendingAction, turnIndex, players, deck, turnsLeft = 1 } = gameState;
+
+      // Execute Logic based on pendingAction.cardType
+      let nextTurnIndex = turnIndex;
+      let nextTurnsLeft = turnsLeft;
+      let currentDeck = deck ? [...deck] : [];
+
+      switch (pendingAction.cardType) {
         case 'SKIP':
             nextTurnsLeft -= 1;
             gameBoardRef.current?.triggerSkip();
             break;
         case 'ATTACK':
             nextTurnsLeft = 0;
-            // Next player gets 2 turns
-            // This is handled by passing turn logic + forcing 2
             gameBoardRef.current?.triggerAttack();
             break;
         case 'SHUFFLE':
@@ -225,86 +345,71 @@ export default function GamePage() {
             const top3 = currentDeck.slice(-3).reverse();
             gameBoardRef.current?.triggerSeeFuture(top3);
             break;
-        case 'FAVOR':
-            // Instead of auto-stealing, we enter Target Selection mode
-            // We need to pause and ask user to select a target
-            // BUT handlePlayCard is called immediately on click.
-            // We should have UI handle selection FIRST, then call play.
-            // gameBoardRef.current?.enableTargetMode(cardIndex) -> User clicks opponent -> calls onSelectTarget
+        // Targeted actions (Favor/Pair) handled separately
+      }
 
-            // Since we are here, it means we clicked the card.
-            // If we haven't selected a target yet, we shouldn't have removed it from hand yet?
-            // Correct flow: UI detects Favor click -> Shows "Select Target" -> User clicks Target -> Calls handlePlayCardWithTarget
+      if (nextTurnsLeft <= 0) {
+         nextTurnIndex = getNextAlivePlayerIndex(turnIndex, players);
+         nextTurnsLeft = pendingAction.cardType === 'ATTACK' ? 2 : 1;
+      }
 
-            // For MVP simplicity in this function:
-            // We'll revert the hand change locally and trigger UI mode if no target passed (complex refactor)
-            // OR: We just pick random for now to match previous logic?
-            // User asked for "Target selection and target gives".
-
-            // Let's implement the UI flow:
-            // 1. User clicks Favor in UI -> UI checks type -> if Favor, set localTargetMode = true.
-            // 2. User clicks Player -> UI calls `onSelectTarget(targetId)`
-            // 3. `onSelectTarget` calls a new function `handlePlayFavor(targetId)` which removes card and sets pendingAction.
-
-            // Since we are inside handlePlayCard which is generic:
-            // We'll revert this function to NOT handle Favor if it requires target.
-            // We will move Favor logic to `handleFavorPlay` triggered by the new prop.
-            return; // Should not reach here for Favor if UI handles it
-
-        default:
-            break;
-    }
-
-    if (nextTurnsLeft <= 0) {
-         nextTurnIndex = getNextAlivePlayerIndex(turnIndex, newPlayers);
-         nextTurnsLeft = card.type === 'ATTACK' ? 2 : 1;
-    }
-
-    try {
-        await update(ref(db, `rooms/${roomId}`), {
-            players: newPlayers,
-            discardPile: newDiscardPile,
-            deck: currentDeck,
-            turnIndex: nextTurnIndex,
-            turnsLeft: nextTurnsLeft
-        });
-    } catch (err: any) {
-        console.error("Play card error:", err);
-    }
+      await update(ref(db, `rooms/${roomId}`), {
+          deck: currentDeck,
+          turnIndex: nextTurnIndex,
+          turnsLeft: nextTurnsLeft,
+          pendingAction: null,
+          nopeTimer: null
+      });
   };
 
   // New handler for Favor flow
   const handleSelectTarget = async (targetId: string) => {
-      // User selected a target for Favor
-      if (!gameState) return;
-      const { players, turnIndex, discardPile, deck } = gameState;
-      const currentPlayer = players[turnIndex];
+      // Ensure we have pending context
+      if (!gameState || !pendingMoveRef.current) return;
 
-      // Find the Favor card in hand (first one)
-      const favorCardIndex = currentPlayer.hand.findIndex((c: Card) => c.type === 'FAVOR');
-      if (favorCardIndex === -1) return;
+      const { cards, indices } = pendingMoveRef.current;
+      const { players, discardPile } = gameState;
+
+      if (targetId === userId) {
+          alert("Không thể chọn chính mình!");
+          return;
+      }
 
       const newPlayers = [...players];
       const playerIndex = newPlayers.findIndex((p) => p.id === userId);
-      const favorCard = newPlayers[playerIndex].hand.splice(favorCardIndex, 1)[0];
+      const player = newPlayers[playerIndex];
 
-      const newDiscardPile = [...(discardPile || []), favorCard];
+      // Remove the cards that were pending
+      indices.sort((a, b) => b - a).forEach(idx => {
+          player.hand.splice(idx, 1);
+      });
 
-      // Set pending action for the TARGET player to give a card
+      const newDiscardPile = [...(discardPile || []), ...cards];
+
+      let actionType = 'favor_give';
+      if (cards.length === 2) actionType = 'pair_steal';
+      if (cards.length === 3) actionType = 'triple_steal';
+
+      // Set pending action + 3s Nope Timer
       const pendingAction = {
-          type: 'favor_give',
+          type: actionType,
           sourcePlayerId: userId,
-          targetPlayerId: targetId
+          targetPlayerId: targetId,
+          cardType: cards[0].type,
+          count: cards.length,
+          startTime: Date.now()
       };
-
-      // Don't pass turn yet! Wait for resolution.
 
       try {
         await update(ref(db, `rooms/${roomId}`), {
             players: newPlayers,
             discardPile: newDiscardPile,
-            pendingAction: pendingAction
+            pendingAction: pendingAction,
+            nopeTimer: Date.now() + 4000 // 3s + buffer
         });
+
+        // Clear the pending move only after successful update
+        pendingMoveRef.current = null;
         gameBoardRef.current?.triggerFavor(players.find((p) => p.id === targetId)?.name || 'Target');
       } catch (err: any) { console.error(err); }
   };
@@ -332,12 +437,18 @@ export default function GamePage() {
       } catch (err: any) { console.error(err); }
   };
 
-  // Modified UI Handler to intercept Favor
-  const onUIPlayCard = (card: any, index: number) => {
-      if (card.type === 'FAVOR') {
-          gameBoardRef.current?.enableTargetMode(index);
+  // Modified UI Handler to intercept Targeted Cards
+  const onUIPlayCard = (cards: any[], indices: number[]) => {
+      const type = cards[0].type;
+      const isPair = cards.length === 2;
+      const isTriple = cards.length === 3;
+
+      if (type === 'FAVOR' || isPair || isTriple) {
+          // Store the intent to play these cards when a target is selected
+          pendingMoveRef.current = { cards, indices };
+          gameBoardRef.current?.enableTargetMode();
       } else {
-          handlePlayCard(card, index);
+          handlePlayCard(cards, indices);
       }
   }
 
@@ -354,7 +465,21 @@ export default function GamePage() {
   if (!gameState) return <div className="text-white bg-blue-900 h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <NewGameBoard
+    <>
+      <div className="absolute top-4 left-4 z-50 flex flex-col gap-2">
+         <div className="bg-blue-950/80 p-2 rounded-lg border border-blue-700 text-xs text-blue-200 backdrop-blur-sm">
+             <div className="flex items-center gap-2 mb-1">
+                 <span className="font-bold text-yellow-400">ID:</span>
+                 <span className="font-mono bg-black/30 px-1 rounded">{String(roomId)}</span>
+                 <button onClick={handleCopyLink} className="text-teal-400 hover:text-white" title="Copy Link">
+                    <span className="material-symbols-outlined text-sm">content_copy</span>
+                 </button>
+             </div>
+             {gameState.gameState === 'waiting' && <p>Chờ người chơi...</p>}
+         </div>
+      </div>
+
+      <NewGameBoard
         ref={gameBoardRef}
         gameState={gameState}
         currentPlayerId={userId}
@@ -363,6 +488,8 @@ export default function GamePage() {
         onStartGame={handleStartGame}
         onGiveCard={handleGiveCard}
         onSelectTarget={handleSelectTarget}
+        onNope={handleNope}
     />
+    </>
   );
 }

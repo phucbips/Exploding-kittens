@@ -1,6 +1,21 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "rooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        "players": {
+          "$index": {
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 15"
+            }
+          }
+        }
+      }
+    },
+    "public_rooms": {
+      ".read": true,
+      ".write": true
+    }
   }
 }
