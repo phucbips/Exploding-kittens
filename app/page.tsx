@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ref, set, get, child } from 'firebase/database';
+import { ref, runTransaction, get } from 'firebase/database';
 import { db } from '@/lib/firebase';
 
 export default function Lobby() {
@@ -16,93 +16,158 @@ export default function Lobby() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
+  const validateName = (inputName: string) => {
+    const trimmed = inputName.trim();
+    if (!trimmed) return 'Vui lòng nhập tên của bạn!';
+    if (trimmed.length > 15) return 'Tên quá dài (tối đa 15 ký tự)!';
+    return null;
+  };
+
   const handleCreateRoom = async () => {
-    if (!name.trim()) {
-      setError('Vui lòng nhập tên của bạn!');
+    const nameError = validateName(name);
+    if (nameError) {
+      setError(nameError);
       return;
     }
 
     setLoading(true);
-    const newRoomId = generateRoomId();
+    setError('');
 
-    // Initial State for a new room
-    const playerData = {
-      id: `user_${Date.now()}`,
-      name: name,
-      isHost: true,
-      hand: [],
-      isAlive: true,
-      hasDefuse: false
-    };
+    // Try to create a room with a unique ID (limit attempts)
+    let created = false;
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    try {
-      await set(ref(db, `rooms/${newRoomId}`), {
-        gameState: 'waiting',
-        players: [playerData],
-        createdAt: Date.now()
-      });
+    while (!created && attempts < maxAttempts) {
+        attempts++;
+        const newRoomId = generateRoomId();
 
-      // Save user info to session storage
-      sessionStorage.setItem('userId', playerData.id);
-      sessionStorage.setItem('userName', name);
+        // Initial State for a new room
+        const playerData = {
+            id: `user_${Date.now()}`,
+            name: name.trim(),
+            isHost: true,
+            hand: [],
+            isAlive: true,
+            hasDefuse: false
+        };
 
-      router.push(`/game/${newRoomId}`);
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi khi tạo phòng. Thử lại xem!');
-    } finally {
-      setLoading(false);
+        try {
+            const result = await runTransaction(ref(db, `rooms/${newRoomId}`), (currentData) => {
+                if (currentData === null) {
+                    // Room doesn't exist, create it
+                    return {
+                        gameState: 'waiting',
+                        players: [playerData],
+                        createdAt: Date.now()
+                    };
+                } else {
+                    // Room exists, abort transaction
+                    return;
+                }
+            }, { applyLocally: false });
+
+            if (result.committed) {
+                created = true;
+                sessionStorage.setItem('userId', playerData.id);
+                sessionStorage.setItem('userName', name.trim());
+                router.push(`/game/${newRoomId}`);
+            }
+            // If not committed, loop runs again with new ID
+        } catch (err) {
+            console.error(err);
+            setError('Lỗi khi tạo phòng. Thử lại xem!');
+            setLoading(false);
+            return;
+        }
+    }
+
+    if (!created) {
+        setError('Không thể tạo phòng (Server busy). Thử lại sau!');
+        setLoading(false);
     }
   };
 
   const handleJoinRoom = async () => {
-    if (!name.trim() || !roomId.trim()) {
-      setError('Nhập tên và ID phòng đi nào!');
+    const nameError = validateName(name);
+    if (nameError) {
+      setError(nameError);
+      return;
+    }
+    if (!roomId.trim()) {
+      setError('Nhập ID phòng đi nào!');
       return;
     }
 
     setLoading(true);
+    setError('');
     const cleanRoomId = roomId.trim().toUpperCase();
 
     try {
-      const roomRef = ref(db);
-      const snapshot = await get(child(roomRef, `rooms/${cleanRoomId}`));
+      const roomRef = ref(db, `rooms/${cleanRoomId}`);
 
-      if (snapshot.exists()) {
-        const roomData = snapshot.val();
+      // Check existence first to ensure local cache is populated for transaction
+      const snapshot = await get(roomRef);
+      if (!snapshot.exists()) {
+        setError('Phòng không tồn tại!');
+        setLoading(false);
+        return;
+      }
 
-        if (roomData.gameState !== 'waiting') {
-            setError('Game đang chơi rồi, không vào được nữa!');
-            setLoading(false);
-            return;
+      let joinError = null;
+      const playerId = `user_${Date.now()}`;
+
+      const result = await runTransaction(roomRef, (currentData) => {
+        if (currentData === null) {
+             // Should not happen if get() succeeded, but robust check
+            joinError = 'Phòng không tồn tại!';
+            return; // Abort
+        }
+        if (currentData.gameState !== 'waiting') {
+            joinError = 'Game đang chơi rồi, không vào được nữa!';
+            return; // Abort
         }
 
-        const players = roomData.players || [];
-        // Check if name already exists (optional but good)
+        const players = currentData.players || [];
+        // Check for duplicate names
+        if (players.some((p: any) => p.name.toLowerCase() === name.trim().toLowerCase())) {
+            joinError = 'Tên này đã có người dùng!';
+            return; // Abort
+        }
+
+        if (players.length >= 5) { // Max players limit
+             joinError = 'Phòng đã đầy!';
+             return;
+        }
 
         const playerData = {
-          id: `user_${Date.now()}`,
-          name: name,
+          id: playerId,
+          name: name.trim(),
           isHost: false,
           hand: [],
           isAlive: true,
           hasDefuse: false
         };
 
-        const updatedPlayers = [...players, playerData];
+        // Add player
+        currentData.players = [...players, playerData];
+        return currentData;
+      });
 
-        await set(ref(db, `rooms/${cleanRoomId}/players`), updatedPlayers);
-
-        sessionStorage.setItem('userId', playerData.id);
-        sessionStorage.setItem('userName', name);
-
+      if (result.committed) {
+        sessionStorage.setItem('userId', playerId);
+        sessionStorage.setItem('userName', name.trim());
         router.push(`/game/${cleanRoomId}`);
       } else {
-        setError('Phòng không tồn tại!');
+          if (joinError) {
+              setError(joinError);
+          } else {
+              setError('Không thể vào phòng (Lỗi không xác định).');
+          }
       }
     } catch (err) {
       console.error(err);
-      setError('Lỗi khi vào phòng. ' + err);
+      setError('Lỗi khi vào phòng: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
