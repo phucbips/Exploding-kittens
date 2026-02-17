@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ref, set, get, child } from 'firebase/database';
+import { ref, set, get, child, runTransaction } from 'firebase/database';
 import { db } from '@/lib/firebase';
 
 export default function Lobby() {
@@ -17,92 +17,149 @@ export default function Lobby() {
   };
 
   const handleCreateRoom = async () => {
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setError('Vui lòng nhập tên của bạn!');
       return;
     }
+    if (trimmedName.length > 20) {
+        setError('Tên quá dài (tối đa 20 ký tự)!');
+        return;
+    }
 
     setLoading(true);
-    const newRoomId = generateRoomId();
 
     // Initial State for a new room
     const playerData = {
       id: `user_${Date.now()}`,
-      name: name,
+      name: trimmedName,
       isHost: true,
       hand: [],
       isAlive: true,
       hasDefuse: false
     };
 
+    let newRoomId = '';
+    let committed = false;
+    let attempts = 0;
+
     try {
-      await set(ref(db, `rooms/${newRoomId}`), {
-        gameState: 'waiting',
-        players: [playerData],
-        createdAt: Date.now()
-      });
+        while (!committed && attempts < 3) {
+            newRoomId = generateRoomId();
+            attempts++;
 
-      // Save user info to session storage
-      sessionStorage.setItem('userId', playerData.id);
-      sessionStorage.setItem('userName', name);
+            const roomRef = ref(db, `rooms/${newRoomId}`);
+            const result = await runTransaction(roomRef, (currentData) => {
+                if (currentData === null) {
+                    return {
+                        gameState: 'waiting',
+                        players: [playerData],
+                        createdAt: Date.now()
+                    };
+                } else {
+                    return; // Abort if exists
+                }
+            });
+            committed = result.committed;
+        }
 
-      router.push(`/game/${newRoomId}`);
-    } catch (err) {
+        if (committed) {
+            // Save user info to session storage
+            sessionStorage.setItem('userId', playerData.id);
+            sessionStorage.setItem('userName', trimmedName);
+
+            router.push(`/game/${newRoomId}`);
+        } else {
+            setError('Không thể tạo phòng (Server busy). Thử lại xem!');
+        }
+
+    } catch (err: any) {
       console.error(err);
-      setError('Lỗi khi tạo phòng. Thử lại xem!');
+      setError('Lỗi khi tạo phòng: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleJoinRoom = async () => {
-    if (!name.trim() || !roomId.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName || !roomId.trim()) {
       setError('Nhập tên và ID phòng đi nào!');
       return;
+    }
+    if (trimmedName.length > 20) {
+        setError('Tên quá dài (tối đa 20 ký tự)!');
+        return;
     }
 
     setLoading(true);
     const cleanRoomId = roomId.trim().toUpperCase();
 
+    // Prepare player data outside transaction to ensure consistent ID
+    const playerData = {
+      id: `user_${Date.now()}`,
+      name: trimmedName,
+      isHost: false,
+      hand: [],
+      isAlive: true,
+      hasDefuse: false
+    };
+
     try {
-      const roomRef = ref(db);
-      const snapshot = await get(child(roomRef, `rooms/${cleanRoomId}`));
+      const roomRef = ref(db, `rooms/${cleanRoomId}`);
 
-      if (snapshot.exists()) {
-        const roomData = snapshot.val();
+      const result = await runTransaction(roomRef, (currentData) => {
+        if (currentData === null) {
+          return; // Room does not exist, abort transaction
+        }
 
-        if (roomData.gameState !== 'waiting') {
-            setError('Game đang chơi rồi, không vào được nữa!');
-            setLoading(false);
+        if (currentData.gameState !== 'waiting') {
+          return; // Game already started, abort
+        }
+
+        const players = currentData.players || [];
+
+        if (players.length >= 8) {
+            return; // Room full
+        }
+
+        // Check for duplicate name
+        if (players.some((p: any) => p.name === trimmedName)) {
             return;
         }
 
-        const players = roomData.players || [];
-        // Check if name already exists (optional but good)
-
-        const playerData = {
-          id: `user_${Date.now()}`,
-          name: name,
-          isHost: false,
-          hand: [],
-          isAlive: true,
-          hasDefuse: false
+        return {
+            ...currentData,
+            players: [...players, playerData]
         };
+      });
 
-        const updatedPlayers = [...players, playerData];
-
-        await set(ref(db, `rooms/${cleanRoomId}/players`), updatedPlayers);
-
+      if (result.committed) {
         sessionStorage.setItem('userId', playerData.id);
-        sessionStorage.setItem('userName', name);
-
+        sessionStorage.setItem('userName', trimmedName);
         router.push(`/game/${cleanRoomId}`);
       } else {
-        setError('Phòng không tồn tại!');
+        // Transaction failed (aborted)
+        // We can do a quick check to give a better error message
+        const snapshot = await get(roomRef);
+        if (!snapshot.exists()) {
+            setError('Phòng không tồn tại!');
+        } else {
+            const data = snapshot.val();
+            if (data.gameState !== 'waiting') {
+                setError('Game đang chơi rồi, không vào được nữa!');
+            } else if ((data.players || []).length >= 8) {
+                setError('Phòng đã đầy!');
+            } else if ((data.players || []).some((p: any) => p.name === trimmedName)) {
+                setError('Tên này đã có người dùng trong phòng!');
+            } else {
+                setError('Không thể vào phòng (Lỗi không xác định).');
+            }
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError('Lỗi khi vào phòng. ' + err);
+      setError('Lỗi khi vào phòng: ' + err.message);
     } finally {
       setLoading(false);
     }
