@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ref, set, get, child } from 'firebase/database';
+import { ref, set, get, child, runTransaction } from 'firebase/database';
 import { db } from '@/lib/firebase';
 
 export default function Lobby() {
@@ -17,88 +17,118 @@ export default function Lobby() {
   };
 
   const handleCreateRoom = async () => {
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    if (!cleanName) {
       setError('Vui lòng nhập tên của bạn!');
+      return;
+    }
+    if (cleanName.length > 20) {
+      setError('Tên quá dài! Tối đa 20 ký tự thôi.');
       return;
     }
 
     setLoading(true);
-    const newRoomId = generateRoomId();
 
-    // Initial State for a new room
-    const playerData = {
-      id: `user_${Date.now()}`,
-      name: name,
-      isHost: true,
-      hand: [],
-      isAlive: true,
-      hasDefuse: false
-    };
+    let success = false;
+    let attempts = 0;
 
-    try {
-      await set(ref(db, `rooms/${newRoomId}`), {
-        gameState: 'waiting',
-        players: [playerData],
-        createdAt: Date.now()
-      });
+    // Retry loop to ensure unique Room ID
+    while (!success && attempts < 3) {
+      attempts++;
+      const newRoomId = generateRoomId();
 
-      // Save user info to session storage
-      sessionStorage.setItem('userId', playerData.id);
-      sessionStorage.setItem('userName', name);
+      const playerData = {
+        id: `user_${Date.now()}`,
+        name: cleanName,
+        isHost: true,
+        hand: [],
+        isAlive: true,
+        hasDefuse: false
+      };
 
-      router.push(`/game/${newRoomId}`);
-    } catch (err) {
-      console.error(err);
-      setError('Lỗi khi tạo phòng. Thử lại xem!');
-    } finally {
-      setLoading(false);
+      try {
+        const result = await runTransaction(ref(db, `rooms/${newRoomId}`), (currentData) => {
+          if (currentData === null) {
+            return {
+              gameState: 'waiting',
+              players: [playerData],
+              createdAt: Date.now()
+            };
+          } else {
+            return; // Abort if room exists
+          }
+        });
+
+        if (result.committed) {
+          success = true;
+          sessionStorage.setItem('userId', playerData.id);
+          sessionStorage.setItem('userName', cleanName);
+          router.push(`/game/${newRoomId}`);
+        }
+      } catch (err) {
+        console.error("Create room transaction failed:", err);
+      }
     }
+
+    if (!success) {
+      setError('Không thể tạo phòng (Server busy). Thử lại xem!');
+    }
+    setLoading(false);
   };
 
   const handleJoinRoom = async () => {
-    if (!name.trim() || !roomId.trim()) {
+    const cleanName = name.trim();
+    if (!cleanName || !roomId.trim()) {
       setError('Nhập tên và ID phòng đi nào!');
+      return;
+    }
+    if (cleanName.length > 20) {
+      setError('Tên quá dài! Tối đa 20 ký tự thôi.');
       return;
     }
 
     setLoading(true);
     const cleanRoomId = roomId.trim().toUpperCase();
 
+    const playerData = {
+      id: `user_${Date.now()}`,
+      name: cleanName,
+      isHost: false,
+      hand: [],
+      isAlive: true,
+      hasDefuse: false
+    };
+
     try {
-      const roomRef = ref(db);
-      const snapshot = await get(child(roomRef, `rooms/${cleanRoomId}`));
-
-      if (snapshot.exists()) {
-        const roomData = snapshot.val();
-
-        if (roomData.gameState !== 'waiting') {
-            setError('Game đang chơi rồi, không vào được nữa!');
-            setLoading(false);
-            return;
+      const result = await runTransaction(ref(db, `rooms/${cleanRoomId}`), (currentData) => {
+        if (currentData === null) {
+          return; // Room doesn't exist
+        }
+        if (currentData.gameState !== 'waiting') {
+          return; // Game already started
         }
 
-        const players = roomData.players || [];
-        // Check if name already exists (optional but good)
-
-        const playerData = {
-          id: `user_${Date.now()}`,
-          name: name,
-          isHost: false,
-          hand: [],
-          isAlive: true,
-          hasDefuse: false
+        const players = currentData.players || [];
+        return {
+          ...currentData,
+          players: [...players, playerData]
         };
+      });
 
-        const updatedPlayers = [...players, playerData];
-
-        await set(ref(db, `rooms/${cleanRoomId}/players`), updatedPlayers);
-
+      if (result.committed) {
         sessionStorage.setItem('userId', playerData.id);
-        sessionStorage.setItem('userName', name);
-
+        sessionStorage.setItem('userName', cleanName);
         router.push(`/game/${cleanRoomId}`);
       } else {
-        setError('Phòng không tồn tại!');
+        // Transaction aborted: check why
+        const snapshot = result.snapshot;
+        if (!snapshot.exists()) {
+          setError('Phòng không tồn tại!');
+        } else if (snapshot.val().gameState !== 'waiting') {
+          setError('Game đang chơi rồi, không vào được nữa!');
+        } else {
+          setError('Không thể vào phòng (Unknown error).');
+        }
       }
     } catch (err) {
       console.error(err);
