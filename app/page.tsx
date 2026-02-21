@@ -6,6 +6,7 @@ import { ref, set, get, child, onValue, off } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { AVATARS } from '@/lib/avatars';
 import Image from 'next/image';
+import Cookies from 'js-cookie';
 
 const MAX_NAME_LENGTH = 15;
 const MAX_ROOM_ID_LENGTH = 10;
@@ -117,6 +118,7 @@ function LobbyContent() {
       sessionStorage.setItem('userId', playerData.id);
       sessionStorage.setItem('userName', name);
       sessionStorage.setItem('userAvatar', selectedAvatar);
+      Cookies.set('userId', playerData.id, { expires: 1 }); // 1 day
 
       router.push(`/lobby/${newRoomId}`);
 
@@ -196,6 +198,7 @@ function LobbyContent() {
       sessionStorage.setItem('userId', newPlayer.id);
       sessionStorage.setItem('userName', name);
       sessionStorage.setItem('userAvatar', selectedAvatar);
+      Cookies.set('userId', newPlayer.id, { expires: 1 });
 
       if (roomData.gameState === 'playing') {
           router.push(`/game/${cleanRoomId}`);
