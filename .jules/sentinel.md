@@ -1,0 +1,4 @@
+## 2024-05-18 - [Hardcoded Firebase Credentials]
+**Vulnerability:** Firebase API keys and other configuration secrets were hardcoded directly in `lib/firebase.js`.
+**Learning:** Hardcoding credentials in source files exposes them to anyone with access to the codebase and could lead to unauthorized access to the Firebase project if the repository is public or compromised.
+**Prevention:** Use environment variables (e.g., `process.env.NEXT_PUBLIC_FIREBASE_API_KEY`) to manage secrets, ensuring they are loaded securely and not committed to version control. Provide a `.env.example` to guide developers.
