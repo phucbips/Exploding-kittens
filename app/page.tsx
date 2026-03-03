@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ref, set, get, child } from 'firebase/database';
 import { db } from '@/lib/firebase';
+import { secureRandomString } from '@/utils/crypto';
 
 export default function Lobby() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return secureRandomString(6).toUpperCase();
   };
 
   const handleCreateRoom = async () => {

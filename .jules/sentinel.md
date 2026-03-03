@@ -1,0 +1,4 @@
+## 2024-05-18 - [Weak RNG Vulnerability]
+**Vulnerability:** Found `Math.random()` being used to generate game logic numbers (deck shuffling, card variant picking, and re-inserting Exploding Kittens) and string identifiers (`roomId`, `userId`, `cardId`). This predictable RNG could allow sophisticated players to predict deck shuffles, future cards, or hijack/predict rooms and IDs.
+**Learning:** For a real-time card game, especially where deck predictability impacts fairness, cryptographically secure RNG is required. `Math.random()` is not secure enough.
+**Prevention:** Avoid `Math.random()` for any logic affecting state or identifiers. Always use the `crypto.getRandomValues()` API and build wrappers (e.g. `secureRandom` in `utils/crypto.js`) to provide drop-in replacements for `Math.random()`.
