@@ -13,6 +13,9 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID().split('-')[0].toUpperCase().substring(0, 6);
+    }
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
