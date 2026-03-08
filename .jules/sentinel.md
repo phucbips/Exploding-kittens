@@ -1,0 +1,4 @@
+## 2024-05-24 - [Insecure Randomness for Game State and ID Generation]
+**Vulnerability:** `Math.random()` was used throughout the application to generate sensitive game logic values such as shuffle order, random target selection, and unique IDs for game rooms and cards.
+**Learning:** `Math.random()` is not cryptographically secure. The V8 engine (and other JS engines) use PRNGs like xorshift128+ for `Math.random()`, which can be predicted if enough sequential outputs are observed. This allows attackers to predict game elements (e.g. deck order, room IDs) and exploit the game logic.
+**Prevention:** Always use `crypto.getRandomValues()` or `crypto.randomUUID()` when generating random numbers for logic that has security implications, including game fairness or generating identifiers. A `getSecureRandomInt` helper has been implemented using `crypto.getRandomValues()`.
