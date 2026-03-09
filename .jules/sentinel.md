@@ -1,0 +1,4 @@
+## 2024-05-18 - [Insecure PRNG for Game Logic]
+**Vulnerability:** Core game mechanics (shuffling decks, generating unique player/card IDs, determining random insertion indices) were using `Math.random()`, which is a weak, predictable pseudo-random number generator (PRNG).
+**Learning:** `Math.random()` in V8/JavaScript engines is cryptographically insecure. In a card game, an attacker could potentially observe sequential outputs, determine the seed state, and predict future shuffles, deck contents, or "random" actions like bomb placement.
+**Prevention:** Always use `window.crypto.getRandomValues()` (Web Crypto API) or `crypto.randomUUID()` for any random numbers that impact game fairness, state integrity, or unique identifiers. `Math.random()` is only acceptable for non-critical UI effects (like visual rotation of a discarded card).
