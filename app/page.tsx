@@ -13,7 +13,9 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    return array[0].toString(36).substring(0, 6).toUpperCase().padStart(6, '0');
   };
 
   const handleCreateRoom = async () => {
