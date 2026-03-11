@@ -1,0 +1,4 @@
+## 2025-03-11 - [Open Firebase Realtime Database Rules]
+**Vulnerability:** The `database.rules.json` allowed global read/write access (`".read": true, ".write": true`). This meant any unauthorized user could read all data in the database and overwrite/delete any data, leading to a complete compromise of all game rooms and player information.
+**Learning:** Default or overly permissive rules during development can be accidentally deployed, leaving the entire database exposed. The specific requirement for this game is that only active `rooms/$roomId` paths should be accessed.
+**Prevention:** Always ensure Firebase rules explicitly deny global read/write access (`".read": false, ".write": false`) and scope access down to only the necessary paths (e.g., `rooms/$roomId`). Implement rule verification checks in the CI/CD pipeline or pre-commit hooks.
