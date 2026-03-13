@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Insecure Firebase Database Rules
+**Vulnerability:** The Firebase Realtime Database rules (`database.rules.json`) were configured to allow global read and write access (`".read": true, ".write": true`). This means anyone with the database URL could read all data and overwrite/delete all data without any authentication or authorization.
+**Learning:** Default or overly permissive security rules are a common misconfiguration in rapid development. It existed because the rules were likely not updated from a development/testing state to a secure production state.
+**Prevention:** Always implement the principle of least privilege. In this specific case, explicitly deny global read/write access and restrict access only to specific necessary paths (e.g., `rooms/$roomId`). Ensure security rules are reviewed and updated before deploying to production.
