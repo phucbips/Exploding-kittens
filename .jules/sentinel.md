@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Firebase Realtime Database Public Rules Vulnerability
+**Vulnerability:** The `database.rules.json` file was configured to allow global read and write access (`".read": true, ".write": true`). This allowed any unauthenticated user to read, write, modify, or delete the entire database.
+**Learning:** This is a common misconfiguration for early prototypes but must never be deployed. It is a critical security risk because all game state and potentially sensitive information within rooms could be maliciously modified or leaked.
+**Prevention:** Always restrict root access with `".read": false, ".write": false` and explicitly open access only to specific paths (e.g., `rooms/$roomId`) and, if possible, incorporate Firebase Authentication (`auth != null`) to validate users.
