@@ -1,0 +1,4 @@
+## 2024-10-27 - Insecure Default Firebase Realtime Database Rules
+**Vulnerability:** The `database.rules.json` file was configured with `".read": true, ".write": true` at the root level, meaning anyone could read and write the entire database. This allows complete exposure and modification of all game rooms and player hands.
+**Learning:** Default test rules often permit global access to facilitate rapid prototyping, but leaving them unchanged is a critical vulnerability when progressing towards a live application. The principle of least privilege dictates explicit access pathways.
+**Prevention:** Always restrict root-level access (`".read": false, ".write": false`) as the baseline. Explicitly define and scope access to the specific paths required by the application logic (e.g., `rooms/$roomId`).
