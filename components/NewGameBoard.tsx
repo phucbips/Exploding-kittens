@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
 import { CARD_TYPES } from '@/utils/gameConfig';
+import { getSecureRandomInt } from '@/utils/cryptoUtils';
 import type { GameState, Player, Card } from '@/types/game';
 
 interface GameBoardProps {
@@ -253,7 +254,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                             {discardPile && discardPile.length > 0 && (
                                 <motion.div
                                     initial={{ scale: 0.5, opacity: 0, rotate: 0 }}
-                                    animate={{ scale: 1, opacity: 1, rotate: Math.random() * 20 - 10 }}
+                                    animate={{ scale: 1, opacity: 1, rotate: getSecureRandomInt(20) - 10 }}
                                     key={discardPile.length} // Key change triggers animation
                                     className="relative w-36 h-52 rounded-xl overflow-hidden shadow-2xl"
                                 >
