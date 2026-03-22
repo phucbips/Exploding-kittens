@@ -1,0 +1,4 @@
+## 2025-01-20 - Weak PRNG (Math.random) used for game logic and IDs
+**Vulnerability:** Weak, predictable random number generation (`Math.random()`) was used across the codebase for critical logic including shuffling the deck, determining bomb insertion points, selecting card variants, and generating room IDs.
+**Learning:** `Math.random()` provides insufficient entropy and predictability for security-sensitive contexts like multiplayer game states and room identifiers, which could allow attackers to predict game outcomes or guess session IDs. The Web Crypto API (`crypto.getRandomValues()` / `crypto.randomUUID()`) should be used instead.
+**Prevention:** Always use cryptographically secure random number generation (CSPRNG) via the Web Crypto API for any logic affecting fair play, session integrity, or unique identifiers. Avoid `Math.random()` for anything other than non-critical UI animations.
