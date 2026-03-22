@@ -123,7 +123,16 @@ export default function GamePage() {
             player.hand.splice(defuseIndex, 1); // Remove Defuse
 
             // Re-insert Explode
-            const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
+            // SECURITY: Use Web Crypto for secure random insertion index
+            const maxIndex = newDeck.length + 1;
+            let insertIndex = 0;
+            if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                const arr = new Uint32Array(1);
+                crypto.getRandomValues(arr);
+                insertIndex = arr[0] % maxIndex;
+            } else {
+                insertIndex = Math.floor(Math.random() * maxIndex);
+            }
             newDeck.splice(insertIndex, 0, card);
             alert(`Mèo Nổ đã được nhét lại vào bộ bài!`);
 

@@ -13,6 +13,14 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
+    // SECURITY: Use Web Crypto API for secure room ID generation
+    // instead of predictable Math.random()
+    if (typeof window !== 'undefined' && window.crypto) {
+      const array = new Uint32Array(1);
+      window.crypto.getRandomValues(array);
+      return array[0].toString(36).substring(0, 6).toUpperCase().padStart(6, '0');
+    }
+    // Fallback if crypto is unavailable (should be rare in modern browsers)
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
