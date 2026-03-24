@@ -1,0 +1,4 @@
+## 2024-05-24 - [Unrestricted Firebase Realtime Database Access]
+**Vulnerability:** The Firebase Realtime Database rules (`database.rules.json`) were configured to allow global read and write access (`".read": true`, `".write": true`). This meant anyone could access, read, modify, or delete the entire database.
+**Learning:** This is a common default configuration oversight when setting up a new Firebase project, prioritizing ease of development over security. The `app` structure was designed with rooms (`rooms/$roomId`), meaning data manipulation only needed to happen there, not globally.
+**Prevention:** Always default to restrictive rules (`".read": false`, `".write": false`) and explicitly whitelist necessary paths (e.g., `"rooms": { "$roomId": { ... } }`). Implement more granular role-based or authentication-based access rules if the application evolves to support user accounts.
