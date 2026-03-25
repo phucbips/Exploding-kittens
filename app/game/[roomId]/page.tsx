@@ -123,7 +123,9 @@ export default function GamePage() {
             player.hand.splice(defuseIndex, 1); // Remove Defuse
 
             // Re-insert Explode
-            const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
+            const randomArray = new Uint32Array(1);
+            crypto.getRandomValues(randomArray);
+            const insertIndex = randomArray[0] % (newDeck.length + 1);
             newDeck.splice(insertIndex, 0, card);
             alert(`Mèo Nổ đã được nhét lại vào bộ bài!`);
 
