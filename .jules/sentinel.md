@@ -1,0 +1,4 @@
+## 2026-03-29 - [Fix Weak Random Number Generation]
+**Vulnerability:** Weak random number generation (`Math.random()`, `Date.now()`) used for sensitive operations like room ID generation, player/card ID assignment, and deck shuffling.
+**Learning:** `Math.random()` and `Date.now()` are predictable and not cryptographically secure, which could allow attackers to guess room IDs, manipulate deck shuffling, or spoof player sessions. This undermines the game's unpredictability and security.
+**Prevention:** Use the Web Crypto API (`crypto.getRandomValues()` and `crypto.randomUUID()`) for all random generation requiring unpredictability, uniqueness, and security. Keep non-security random usage (e.g., UI animations) separate if performance is a critical factor, but default to secure PRNGs.
