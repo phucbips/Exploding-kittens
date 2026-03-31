@@ -1,0 +1,4 @@
+## 2024-03-31 - Insecure PRNG via Math.random() in Game Shuffling and Key Generation
+**Vulnerability:** The application used `Math.random()` to shuffle the deck, assign card variants, select bomb placement, and generate unique IDs (`roomId` and `userId`).
+**Learning:** `Math.random()` is not cryptographically secure, meaning its random number generator state can be predicted. In a multiplayer card game, an attacker predicting PRNG values can deduce the layout of the deck (who has which cards) or hijack sessions if IDs are predictable.
+**Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) for sensitive randomness, including deck shuffling in card games and unique identifier generation. Avoid using `Date.now()` or `Math.random()` as components of unique identifiers or game logic entropy.

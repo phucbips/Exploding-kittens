@@ -1,10 +1,17 @@
 import { CARD_TYPES } from './gameConfig';
 
+// Helper to get a cryptographically secure random number between 0 and 1
+const getSecureRandom = () => {
+  const array = new Uint32Array(1);
+  crypto.getRandomValues(array);
+  return array[0] / (0xffffffff + 1);
+};
+
 export const shuffle = (array) => {
   let currentIndex = array.length, randomIndex;
 
   while (currentIndex !== 0) {
-    randomIndex = Math.floor(Math.random() * currentIndex);
+    randomIndex = Math.floor(getSecureRandom() * currentIndex);
     currentIndex--;
     [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
   }
@@ -14,7 +21,7 @@ export const shuffle = (array) => {
 
 const getRandomVariant = (cardType) => {
     if (cardType.variants && cardType.variants.length > 0) {
-        return cardType.variants[Math.floor(Math.random() * cardType.variants.length)];
+        return cardType.variants[Math.floor(getSecureRandom() * cardType.variants.length)];
     }
     return cardType.image;
 };
@@ -29,7 +36,7 @@ export const createDeck = () => {
     if (key !== 'EXPLODE' && key !== 'DEFUSE') {
       for (let i = 0; i < cardType.count; i++) {
         deck.push({
-          id: `${key}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `${key}_${i}_${crypto.randomUUID()}`,
           type: key,
           ...cardType,
           image: getRandomVariant(cardType)
@@ -44,7 +51,7 @@ export const createDeck = () => {
 export const initializeGame = (playerNames) => {
   let deck = createDeck();
   const players = playerNames.map((name, index) => ({
-    id: `player_${index}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `player_${index}_${crypto.randomUUID()}`,
     name,
     hand: [],
     isAlive: true,
@@ -56,7 +63,7 @@ export const initializeGame = (playerNames) => {
   const defuseType = CARD_TYPES.DEFUSE;
   players.forEach(player => {
     player.hand.push({
-      id: `DEFUSE_${Math.random().toString(36).substr(2, 9)}`,
+      id: `DEFUSE_${crypto.randomUUID()}`,
       type: 'DEFUSE',
       ...defuseType,
       image: getRandomVariant(defuseType)
@@ -77,7 +84,7 @@ export const initializeGame = (playerNames) => {
   const remainingDefuseCount = Math.max(0, defuseType.count - players.length);
   for (let i = 0; i < remainingDefuseCount; i++) {
     deck.push({
-        id: `DEFUSE_deck_${i}`,
+        id: `DEFUSE_deck_${i}_${crypto.randomUUID()}`,
         type: 'DEFUSE',
         ...defuseType,
         image: getRandomVariant(defuseType)
@@ -90,7 +97,7 @@ export const initializeGame = (playerNames) => {
 
   for (let i = 0; i < explodeCount; i++) {
     deck.push({
-      id: `EXPLODE_${i}`,
+      id: `EXPLODE_${crypto.randomUUID()}`,
       type: 'EXPLODE',
       ...explodeType,
       image: getRandomVariant(explodeType)
