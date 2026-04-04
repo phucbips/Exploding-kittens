@@ -106,8 +106,8 @@ export default function GamePage() {
 
     let nextTurnIndex = turnIndex;
     let nextTurnsLeft = turnsLeft - 1;
-    let newPendingAction = null;
-    let newActiveBomb = null;
+    const newPendingAction = null;
+    const newActiveBomb = null;
 
     if (card.type === 'EXPLODE') {
         const defuseIndex = player.hand ? player.hand.findIndex((c) => c.type === 'DEFUSE') : -1;
@@ -204,7 +204,7 @@ export default function GamePage() {
     let nextTurnIndex = turnIndex;
     let nextTurnsLeft = turnsLeft;
     let currentDeck = deck ? [...deck] : [];
-    let newPendingAction = null;
+    const newPendingAction = null;
 
     switch (card.type) {
         case 'SKIP':
