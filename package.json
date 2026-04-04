@@ -18,12 +18,13 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^15.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0"
   }
