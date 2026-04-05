@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
-import { initializeGame, shuffle } from '@/utils/gameLogic';
+import { initializeGame, shuffle, secureRandom } from '@/utils/gameLogic';
 import type { GameState, Card, Player } from '@/types/game';
 
 export default function GamePage() {
@@ -106,8 +106,8 @@ export default function GamePage() {
 
     let nextTurnIndex = turnIndex;
     let nextTurnsLeft = turnsLeft - 1;
-    let newPendingAction = null;
-    let newActiveBomb = null;
+    const newPendingAction = null;
+    const newActiveBomb = null;
 
     if (card.type === 'EXPLODE') {
         const defuseIndex = player.hand ? player.hand.findIndex((c) => c.type === 'DEFUSE') : -1;
@@ -123,7 +123,7 @@ export default function GamePage() {
             player.hand.splice(defuseIndex, 1); // Remove Defuse
 
             // Re-insert Explode
-            const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
+            const insertIndex = Math.floor(secureRandom() * (newDeck.length + 1));
             newDeck.splice(insertIndex, 0, card);
             alert(`Mèo Nổ đã được nhét lại vào bộ bài!`);
 
@@ -204,7 +204,7 @@ export default function GamePage() {
     let nextTurnIndex = turnIndex;
     let nextTurnsLeft = turnsLeft;
     let currentDeck = deck ? [...deck] : [];
-    let newPendingAction = null;
+    const newPendingAction = null;
 
     switch (card.type) {
         case 'SKIP':
