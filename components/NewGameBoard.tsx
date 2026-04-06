@@ -118,7 +118,7 @@ const NewGameBoard = forwardRef(({ gameState, currentPlayerId, onDrawCard, onPla
                         <span className="material-symbols-outlined text-3xl">menu</span>
                     </button>
                     <div className="flex flex-col">
-                        <h1 className="font-bold text-xl tracking-wide text-white">Stitch's Chaos</h1>
+                        <h1 className="font-bold text-xl tracking-wide text-white">Stitch&apos;s Chaos</h1>
                         <span className="text-xs text-white/60 font-mono tracking-widest">GALACTIC FEDERATION: ONLINE</span>
                     </div>
                 </div>
