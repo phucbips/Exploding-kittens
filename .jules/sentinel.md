@@ -1,0 +1,4 @@
+## 2024-04-07 - [Insecure Randomness / PRNG Predictability in Game State]
+**Vulnerability:** Weak PRNG (`Math.random()`) was being used for game-critical logic including shuffling the deck, determining the placement of returning Exploding Kittens, and generating Room/Player/Card IDs. `Math.random()` is cryptographically insecure and predictable, opening the possibility for an attacker to deduce the state of the deck or brute-force identifiers.
+**Learning:** In multiplayer card games, state randomization (shuffles, draws) and identifier generation must use cryptographically secure methods (`crypto.getRandomValues()` or `crypto.randomUUID()`) to prevent state prediction or collision attacks.
+**Prevention:** Implement a secure random wrapper (`secureRandom`) around the Web Crypto API for any float generations in range [0, 1), and strictly use `crypto.randomUUID()` to generate unique and unpredictable IDs rather than stringifying insecure randoms.
