@@ -1,0 +1,4 @@
+## 2026-04-08 - [Insecure Randomness in Game Logic and ID Generation]
+**Vulnerability:** The application relied heavily on `Math.random()` and `Date.now()` for shuffling the card deck, drawing cards, and generating critical IDs (like `roomId` and `userId`).
+**Learning:** `Math.random()` is not cryptographically secure and its outputs are predictable. Using it for game logic such as shuffling a deck makes the game susceptible to manipulation or reverse-engineering of the deck state. Using `Date.now()` combined with `Math.random()` for IDs can lead to collisions and predictability.
+**Prevention:** Always use the Web Crypto API (`globalThis.crypto.getRandomValues()` or `globalThis.crypto.randomUUID()`) when unpredictability or security is required, including shuffling cards or generating unique identifiers in client-side game logic.
