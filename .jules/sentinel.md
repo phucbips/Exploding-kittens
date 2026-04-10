@@ -1,0 +1,4 @@
+## 2025-04-10 - [Weak Random Number Generation in Game Logic]
+**Vulnerability:** The application used `Math.random()` and `Date.now()` for critical game mechanics including room IDs, user IDs, shuffling the deck, selecting variants, and bomb insertion. These functions do not provide cryptographically secure random numbers, making the generation predictable and vulnerable to manipulation.
+**Learning:** `Math.random()` should only be used for non-security critical operations (e.g., cosmetic UI rotations). In multiplayer games or logic requiring unpredictability (deck shuffling, ID generation, random mechanics), predictable generation can completely break game integrity.
+**Prevention:** Always use the Web Crypto API (`globalThis.crypto.getRandomValues()` or `globalThis.crypto.randomUUID()`) when generating values that require strong unpredictability or uniqueness.
