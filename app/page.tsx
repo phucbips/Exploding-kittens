@@ -13,7 +13,15 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // 🛡️ Sentinel: Secure random room ID generation using Web Crypto API
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const array = new Uint32Array(6);
+    globalThis.crypto.getRandomValues(array);
+    let result = '';
+    for (let i = 0; i < array.length; i++) {
+        result += chars[array[i] % chars.length];
+    }
+    return result;
   };
 
   const handleCreateRoom = async () => {
@@ -26,8 +34,9 @@ export default function Lobby() {
     const newRoomId = generateRoomId();
 
     // Initial State for a new room
+    // 🛡️ Sentinel: Secure user ID generation using Web Crypto API
     const playerData = {
-      id: `user_${Date.now()}`,
+      id: `user_${globalThis.crypto.randomUUID()}`,
       name: name,
       isHost: true,
       hand: [],
@@ -80,8 +89,9 @@ export default function Lobby() {
         const players = roomData.players || [];
         // Check if name already exists (optional but good)
 
+        // 🛡️ Sentinel: Secure user ID generation using Web Crypto API
         const playerData = {
-          id: `user_${Date.now()}`,
+          id: `user_${globalThis.crypto.randomUUID()}`,
           name: name,
           isHost: false,
           hand: [],
