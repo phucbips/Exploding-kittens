@@ -1,10 +1,16 @@
 import { CARD_TYPES } from './gameConfig';
 
+const secureRandom = () => {
+  const array = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(array);
+  return array[0] / (0xffffffff + 1);
+};
+
 export const shuffle = (array) => {
   let currentIndex = array.length, randomIndex;
 
   while (currentIndex !== 0) {
-    randomIndex = Math.floor(Math.random() * currentIndex);
+    randomIndex = Math.floor(secureRandom() * currentIndex);
     currentIndex--;
     [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
   }
@@ -14,7 +20,7 @@ export const shuffle = (array) => {
 
 const getRandomVariant = (cardType) => {
     if (cardType.variants && cardType.variants.length > 0) {
-        return cardType.variants[Math.floor(Math.random() * cardType.variants.length)];
+        return cardType.variants[Math.floor(secureRandom() * cardType.variants.length)];
     }
     return cardType.image;
 };
@@ -29,7 +35,7 @@ export const createDeck = () => {
     if (key !== 'EXPLODE' && key !== 'DEFUSE') {
       for (let i = 0; i < cardType.count; i++) {
         deck.push({
-          id: `${key}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `${key}_${i}_${globalThis.crypto.randomUUID()}`,
           type: key,
           ...cardType,
           image: getRandomVariant(cardType)
@@ -44,7 +50,7 @@ export const createDeck = () => {
 export const initializeGame = (playerNames) => {
   let deck = createDeck();
   const players = playerNames.map((name, index) => ({
-    id: `player_${index}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `player_${index}_${globalThis.crypto.randomUUID()}`,
     name,
     hand: [],
     isAlive: true,
@@ -56,7 +62,7 @@ export const initializeGame = (playerNames) => {
   const defuseType = CARD_TYPES.DEFUSE;
   players.forEach(player => {
     player.hand.push({
-      id: `DEFUSE_${Math.random().toString(36).substr(2, 9)}`,
+      id: `DEFUSE_${globalThis.crypto.randomUUID()}`,
       type: 'DEFUSE',
       ...defuseType,
       image: getRandomVariant(defuseType)
