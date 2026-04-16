@@ -1,0 +1,4 @@
+## 2026-04-16 - Fix Insecure PRNG for IDs and Shuffling
+**Vulnerability:** The application used `Math.random()` and `Date.now()` for generating session IDs, room IDs, and game logic (deck shuffling, variants, bomb insertion). This is a weak pseudo-random number generator that can be easily predicted, allowing an attacker to hijack sessions, guess room IDs, or predict deck order.
+**Learning:** For any IDs or randomization that affect game fairness or security, cryptographically secure pseudo-random number generators (CSPRNG) must be used. `Math.random()` should only be used for non-security-critical visual effects.
+**Prevention:** Always use `globalThis.crypto.randomUUID()` for generating unique identifiers. For random numbers, use a helper function that leverages `globalThis.crypto.getRandomValues()`. Never use `Date.now()` as a component of an ID.
