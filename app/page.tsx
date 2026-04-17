@@ -13,7 +13,12 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // 🛡️ Sentinel: Fixed insecure Math.random() for room ID generation.
+    // Using cryptographically secure random generation.
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const array = new Uint8Array(6);
+    globalThis.crypto.getRandomValues(array);
+    return Array.from(array, byte => chars[byte % chars.length]).join('');
   };
 
   const handleCreateRoom = async () => {
@@ -26,8 +31,10 @@ export default function Lobby() {
     const newRoomId = generateRoomId();
 
     // Initial State for a new room
+    // 🛡️ Sentinel: Fixed predictable Date.now() for user ID generation.
+    // Using secure random UUID.
     const playerData = {
-      id: `user_${Date.now()}`,
+      id: `user_${globalThis.crypto.randomUUID()}`,
       name: name,
       isHost: true,
       hand: [],
@@ -81,7 +88,8 @@ export default function Lobby() {
         // Check if name already exists (optional but good)
 
         const playerData = {
-          id: `user_${Date.now()}`,
+          // 🛡️ Sentinel: Fixed predictable Date.now() for user ID generation.
+          id: `user_${globalThis.crypto.randomUUID()}`,
           name: name,
           isHost: false,
           hand: [],
