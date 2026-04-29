@@ -1,0 +1,4 @@
+## 2025-02-23 - [Firebase Realtime Database Global Access Vulnerability]
+**Vulnerability:** The `database.rules.json` file had globally permissive read/write access (`".read": true, ".write": true`) configured at the root.
+**Learning:** This exposes the entire database to unauthorized reading, writing, or deletion. Anyone could scrape all user data, modify game states, or drop the entire database structure since no path restrictions were in place.
+**Prevention:** Always apply the Principle of Least Privilege by explicitly setting `".read": false` and `".write": false` at the root level. Use path-based rules (e.g., `"rooms": { "$roomId": { ".read": true, ".write": true } }`) to restrict data access only to required endpoints, while leveraging authentication and authorization checks wherever possible.
