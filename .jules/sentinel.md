@@ -1,0 +1,4 @@
+## 2024-05-01 - [Global Database Exposure]
+**Vulnerability:** The Firebase Realtime Database was configured with `.read: true` and `.write: true` at the root level, allowing anyone to read and write all data in the database.
+**Learning:** Default Firebase security rules can lead to significant data exposure if not updated before production. It is critical to follow the principle of least privilege.
+**Prevention:** Always configure Firebase security rules to explicitly deny global read/write access (`".read": false, ".write": false`) and restrict access strictly to the required paths, such as `rooms/$roomId`.
