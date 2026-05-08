@@ -1,0 +1,4 @@
+## 2024-05-08 - Fix Open Firebase Database Rules
+**Vulnerability:** The Firebase Realtime Database was configured with global read and write access (`".read": true, ".write": true`), allowing anyone with the project ID to read or modify any data in the database.
+**Learning:** Default database rules are often left open during development for convenience but must be restricted before deploying or sharing the application to prevent unauthorized access and data tampering.
+**Prevention:** Always implement explicit, restrictive security rules (`".read": false, ".write": false`) at the root level and grant access only to specific paths (e.g., `rooms/$roomId`) where necessary based on the application's data model.
