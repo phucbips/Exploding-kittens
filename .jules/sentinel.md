@@ -1,0 +1,4 @@
+## 2025-02-14 - [CRITICAL] Fix Unrestricted Global Access in Firebase Realtime Database
+**Vulnerability:** The `database.rules.json` file allowed global `.read` and `.write` access at the root node. This permitted unauthenticated and unrestricted data extraction, modification, or deletion of the entire database.
+**Learning:** Initial scaffolding and rapid prototyping often leave database rules wide open (`true`). When deploying Firebase, these rules must be tightened to scope data access properly to avoid total data compromise.
+**Prevention:** Always verify `database.rules.json` before committing Firebase changes. Ensure root access is `false` by default and apply specific read/write permissions exclusively to the required child nodes (e.g., `rooms/$roomId`).
