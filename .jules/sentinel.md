@@ -1,0 +1,4 @@
+## 2024-05-19 - [CRITICAL] Global Firebase Database Access
+**Vulnerability:** The Firebase Realtime Database security rules (`database.rules.json`) were configured to allow global read and write access (`".read": true, ".write": true`). This allowed any unauthenticated user to read or modify the entire database.
+**Learning:** This is a critical security vulnerability that exposes all user data and game state to anyone. It likely existed during initial development for ease of testing but was not secured before production.
+**Prevention:** Always follow the principle of least privilege. In Firebase, explicitly deny global access (`".read": false, ".write": false`) and restrict access to specific paths required for the application's functionality (e.g., `rooms/$roomId`). Consider using Firebase Authentication and validating user IDs in rules for more granular security.
