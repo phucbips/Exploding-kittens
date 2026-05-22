@@ -1,0 +1,4 @@
+## 2026-05-22 - [Globally Permissive Firebase Realtime Database Rules]
+**Vulnerability:** Firebase Realtime Database was configured with `.read: true` and `.write: true` at the root, allowing unauthorized users to globally read, write, or delete the entire database content.
+**Learning:** Default configuration or initial development settings often use excessively permissive rules. This leaves all data completely exposed to anyone who knows the database URL and project ID, bypassing any client-side access controls.
+**Prevention:** Always implement explicitly restrictive base rules (`".read": false, ".write": false`) and use the principle of least privilege by targeting specific paths (e.g., `"rooms": { "$roomId": { ... } }`) where access is genuinely required. Review database rules as part of standard security audits before deploying.
