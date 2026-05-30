@@ -1,0 +1,4 @@
+## 2025-03-01 - Predictable Identifiers via Math.random() and Date.now()
+**Vulnerability:** Core logic and identifiers (User ID, Room ID, Card UUIDs, and Deck shuffling) were generated using insecure functions like `Math.random().toString(36)` and `Date.now()`.
+**Learning:** `Math.random()` generates pseudo-random numbers predictably depending on browser/V8 implementation, which can be reverse engineered. `Date.now()` allows users to easily predict identifiers since it relies on millisecond time increments. This allows an attacker to predict deck order or hijack game sessions by guessing predictable Room or User IDs.
+**Prevention:** Implement and enforce a `utils/secureRandom.ts` module that leverages `globalThis.crypto` (Web Crypto API) for cryptographically secure UUIDs, strings, and random integer sampling. Always use functions like `generateUUID` or `getSecureRandomInt` for secure components.

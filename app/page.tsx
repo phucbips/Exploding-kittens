@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ref, set, get, child } from 'firebase/database';
 import { db } from '@/lib/firebase';
+import { generateSecureId, generateUUID } from '@/utils/secureRandom';
 
 export default function Lobby() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return generateSecureId(6).toUpperCase();
   };
 
   const handleCreateRoom = async () => {
@@ -27,7 +28,7 @@ export default function Lobby() {
 
     // Initial State for a new room
     const playerData = {
-      id: `user_${Date.now()}`,
+      id: `user_${generateUUID()}`,
       name: name,
       isHost: true,
       hand: [],
@@ -81,7 +82,7 @@ export default function Lobby() {
         // Check if name already exists (optional but good)
 
         const playerData = {
-          id: `user_${Date.now()}`,
+          id: `user_${generateUUID()}`,
           name: name,
           isHost: false,
           hand: [],
