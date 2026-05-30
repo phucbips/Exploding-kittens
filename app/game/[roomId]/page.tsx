@@ -6,6 +6,7 @@ import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import NewGameBoard from '@/components/NewGameBoard';
 import { initializeGame, shuffle } from '@/utils/gameLogic';
+import { getSecureRandomInt } from '@/utils/secureRandom';
 import type { GameState, Card, Player } from '@/types/game';
 
 export default function GamePage() {
@@ -123,7 +124,7 @@ export default function GamePage() {
             player.hand.splice(defuseIndex, 1); // Remove Defuse
 
             // Re-insert Explode
-            const insertIndex = Math.floor(Math.random() * (newDeck.length + 1));
+            const insertIndex = getSecureRandomInt(newDeck.length + 1);
             newDeck.splice(insertIndex, 0, card);
             alert(`Mèo Nổ đã được nhét lại vào bộ bài!`);
 
