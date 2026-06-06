@@ -1,0 +1,4 @@
+## 2025-06-06 - [Predictable ID Generation & Shuffling (CWE-330)]
+**Vulnerability:** The application used insecure `Math.random()` and `Date.now()` to generate game room IDs, player IDs, card IDs, and to shuffle decks. This predictable value generation allows attackers to guess upcoming cards, room IDs, and potentially hijack user sessions due to sequential or predictable `user_` IDs.
+**Learning:** In a multiplayer online game, relying on `Math.random()` for any core logic, particularly shuffling or secrets/IDs, is fundamentally insecure.
+**Prevention:** Always use cryptographically secure utilities like the Web Crypto API (`globalThis.crypto.getRandomValues()` and `globalThis.crypto.randomUUID()`) when generating random sequences, IDs, or shuffling elements. A dedicated utility file (`utils/secureRandom.ts`) was created to centralize this security pattern across the project.
