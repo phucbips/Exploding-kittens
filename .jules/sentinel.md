@@ -1,0 +1,4 @@
+## 2026-06-09 - [CRITICAL] Unauthenticated Firebase Database Access
+**Vulnerability:** The Firebase Realtime Database rules were configured with global read/write access (`".read": true, ".write": true`). This allowed any user, authenticated or not, to read and modify all data in the database, potentially leading to unauthorized data access and manipulation.
+**Learning:** The project relies on custom IDs (`userId`) and `sessionStorage` for user sessions, completely bypassing Firebase Authentication. As a result, standard Firebase rules like `auth != null` cannot be used to secure data access.
+**Prevention:** In architectures lacking traditional authentication, security must be enforced via strict path scoping. The database rules were updated to deny global access (`".read": false, ".write": false`) and explicitly grant access only to the necessary paths (`rooms/$roomId`).
