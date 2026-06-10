@@ -1,0 +1,4 @@
+## 2025-02-14 - Fix weak random ID generation in Room IDs and User IDs
+**Vulnerability:** Room IDs and User IDs were generated using predictable methods (`Math.random().toString(36)` and `Date.now()`). This weakness could allow attackers to predict room names and user IDs, leading to potential unauthorized access or session hijacking.
+**Learning:** Even for non-critical identifiers like room codes or session user IDs in small games, using standard pseudo-random functions like `Math.random` is an insecure default that easily leads to enumeration and collision vulnerabilities.
+**Prevention:** Always use cryptographically secure random number generators (CSPRNG), such as the Web Crypto API (`globalThis.crypto.getRandomValues()` and `globalThis.crypto.randomUUID()`), for generating any form of IDs, secrets, or random values that could impact security or authorization.
