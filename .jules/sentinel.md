@@ -1,0 +1,4 @@
+## 2025-02-23 - [HIGH] Insecure Randomness in Game Logic and ID Generation
+**Vulnerability:** Weak, predictable pseudorandom number generators (`Math.random()`, `Date.now()`) were used for generating Room IDs, user/player IDs, and shuffling the game deck.
+**Learning:** `Math.random()` and `Date.now()` are not cryptographically secure and can be easily predicted. This predictability allows an attacker to guess Room IDs, hijack sessions by guessing user IDs, or perfectly predict the order of a shuffled deck, fundamentally breaking the game's security and fairness.
+**Prevention:** Always use the Web Crypto API (`globalThis.crypto.getRandomValues()` and `globalThis.crypto.randomUUID()`) when generating unique identifiers or handling random logic that has security or fairness implications. Ensure correct mapping arrays are used rather than simple radix conversion (like `.toString(36)`) to avoid bias.
