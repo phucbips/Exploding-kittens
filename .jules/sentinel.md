@@ -1,0 +1,4 @@
+## 2025-02-20 - [Insecure PRNG in Game Logic and IDs]
+**Vulnerability:** The application was using `Math.random()` for critical game logic such as deck shuffling, card variant selection, and re-inserting Exploding Kittens. It also used `Math.random().toString(36)` and `Date.now()` for generating Room IDs and User IDs. This allows an attacker to predict the PRNG state, potentially predicting the deck order, and creates predictable IDs.
+**Learning:** `Math.random()` is not cryptographically secure and should never be used for game mechanics where unpredictability is required, or for ID generation.
+**Prevention:** Always use the Web Crypto API (`globalThis.crypto.getRandomValues()` and `globalThis.crypto.randomUUID()`) for game logic and ID generation to ensure cryptographically secure unpredictability.
