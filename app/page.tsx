@@ -13,7 +13,12 @@ export default function Lobby() {
   const [error, setError] = useState('');
 
   const generateRoomId = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const randomArray = new Uint8Array(6);
+    globalThis.crypto.getRandomValues(randomArray);
+    return Array.from(randomArray)
+      .map(x => chars[x % chars.length])
+      .join('');
   };
 
   const handleCreateRoom = async () => {
@@ -27,7 +32,7 @@ export default function Lobby() {
 
     // Initial State for a new room
     const playerData = {
-      id: `user_${Date.now()}`,
+      id: `user_${globalThis.crypto.randomUUID()}`,
       name: name,
       isHost: true,
       hand: [],
@@ -81,7 +86,7 @@ export default function Lobby() {
         // Check if name already exists (optional but good)
 
         const playerData = {
-          id: `user_${Date.now()}`,
+          id: `user_${globalThis.crypto.randomUUID()}`,
           name: name,
           isHost: false,
           hand: [],
