@@ -1,0 +1,4 @@
+## 2024-06-27 - [Insecure Randomness in ID Generation]
+**Vulnerability:** Room IDs and User IDs were generated using predictable and insecure methods: `Math.random().toString(36)` and `Date.now()`.
+**Learning:** These methods are cryptographically insecure, making it possible for attackers to predict room IDs or hijack user sessions by guessing predictable user IDs.
+**Prevention:** Always use Web Crypto API (`globalThis.crypto.getRandomValues()` or `globalThis.crypto.randomUUID()`) for generating secure, unpredictable identifiers. Do not rely on `Math.random()` or time-based seeds for security-sensitive IDs.
