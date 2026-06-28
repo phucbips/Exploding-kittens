@@ -1,0 +1,4 @@
+## 2024-06-28 - Insecure Firebase Realtime Database Rules Allow Unauthenticated Global Access
+**Vulnerability:** The Firebase Realtime Database rules (`database.rules.json`) were configured with global `.read: true` and `.write: true`. This allowed any unauthenticated user with the database URL to read or modify all data across the entire database.
+**Learning:** Default or lax database rules used during rapid development/prototyping are often forgotten and deployed to production, exposing all sensitive application data. Without proper authentication (which this app lacks via Firebase Auth), path-based restrictions are the only layer of defense.
+**Prevention:** Always restrict default global access by explicitly setting `.read: false` and `.write: false` at the root. Scope read and write access strictly to the required paths (e.g., `rooms/$roomId`) and employ proper validation rules to ensure only valid game data structures can be written.
