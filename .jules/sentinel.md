@@ -1,0 +1,4 @@
+## 2024-05-17 - [Securing Firebase Rules without Auth]
+**Vulnerability:** Firebase database rules were fully open (`".read": true, ".write": true`), allowing unauthenticated attackers to read or modify any data in the entire database.
+**Learning:** Because the app does not use Firebase Auth (using sessionStorage/custom IDs instead), standard `auth != null` rules cannot be used. We must restrict access to the specific paths (e.g. `rooms/$roomId`) and deny global access to limit the attack surface.
+**Prevention:** Always default to `".read": false, ".write": false` globally in Firebase rules, and explicitly grant access only to the necessary paths (e.g., specific tables or rooms) when full authentication is not feasible.
