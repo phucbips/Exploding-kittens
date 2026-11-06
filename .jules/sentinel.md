@@ -1,0 +1,4 @@
+## 2025-02-18 - [CRITICAL] Overly Permissive Firebase Database Rules
+**Vulnerability:** The Firebase Realtime Database rules were configured to allow global read and write access (`".read": true, ".write": true`). This allowed anyone with the database URL to read or modify any data in the database, including all active game rooms.
+**Learning:** Development environments often start with open rules for convenience, but these can accidentally be carried into production. This application only uses custom session IDs and does not use Firebase Auth, so restricting rules by user ID isn't possible. However, the application only needs to access the `/rooms/$roomId` path.
+**Prevention:** Always restrict database rules to only the required paths. Set global `.read` and `.write` to `false` and explicitly enable access to required paths (e.g., `rooms/$roomId`) to minimize the attack surface, even when Firebase Auth is not used.
