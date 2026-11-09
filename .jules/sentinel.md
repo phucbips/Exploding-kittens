@@ -1,0 +1,4 @@
+## 2024-05-14 - [Firebase Rules Restricting Global Access]
+**Vulnerability:** Firebase Realtime Database rules were misconfigured, allowing global read and write access (`".read": true, ".write": true`). This permitted any user to access or modify any data in the entire database.
+**Learning:** In applications relying on custom session IDs (e.g., in sessionStorage) without standard Firebase Authentication, standard `auth != null` rules cannot be used. However, this does not mean the database must remain open globally. Access should be scoped strictly to the minimal required path, like `rooms/$roomId`.
+**Prevention:** Always default to denying all read/write operations globally. Specifically define rules for paths that require client access (e.g., `rooms/$roomId`) and ensure they don't grant broader access than necessary. Review security rules carefully for unauthenticated applications to isolate data boundaries.
